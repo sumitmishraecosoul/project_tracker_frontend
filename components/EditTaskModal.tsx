@@ -1,7 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { Task } from '../lib/data';
+import { useState, useEffect } from 'react';
+import { apiService } from '../lib/api-service';
+
+interface Task {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  status: 'Not Started' | 'In Progress' | 'Completed' | 'Blocked';
+  priority: 'Low' | 'Medium' | 'High';
+  assignedTo: string;
+  dueDate: string;
+  estimatedHours?: number;
+  actualHours?: number;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface EditTaskModalProps {
   task: Task;
@@ -11,13 +30,30 @@ interface EditTaskModalProps {
 
 export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalProps) {
   const [formData, setFormData] = useState<Task>(task);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const data = await apiService.getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     onSave(formData);
+    setLoading(false);
   };
 
-  const handleInputChange = (field: keyof Task, value: string) => {
+  const handleInputChange = (field: keyof Task, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -39,83 +75,111 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Task</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Task Title</label>
               <input
                 type="text"
-                value={formData.task}
-                onChange={(e) => handleInputChange('task', e.target.value)}
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
-              <input
-                type="date"
-                value={formData.eta}
-                onChange={(e) => handleInputChange('eta', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Not Started">Not Started</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Blocked">Blocked</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Blocked">Blocked</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => handleInputChange('priority', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To</label>
-              <input
-                type="text"
+              <select
                 value={formData.assignedTo}
                 onChange={(e) => handleInputChange('assignedTo', e.target.value)}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">Select a user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+              <input
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => handleInputChange('dueDate', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Remark</label>
-              <textarea
-                value={formData.remark}
-                onChange={(e) => handleInputChange('remark', e.target.value)}
-                rows={3}
-                maxLength={500}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              />
-            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={formData.estimatedHours || 0}
+                  onChange={(e) => handleInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Road Block</label>
-              <textarea
-                value={formData.roadBlock}
-                onChange={(e) => handleInputChange('roadBlock', e.target.value)}
-                rows={3}
-                maxLength={500}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Support Needed</label>
-              <textarea
-                value={formData.supportNeeded}
-                onChange={(e) => handleInputChange('supportNeeded', e.target.value)}
-                rows={3}
-                maxLength={500}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={formData.actualHours || 0}
+                  onChange={(e) => handleInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
             </div>
           </div>
 
@@ -129,9 +193,10 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Changes
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

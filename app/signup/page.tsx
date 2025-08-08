@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiService } from '../../lib/api-service';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -49,30 +50,18 @@ export default function SignupPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-          department: formData.department
-        }),
+      await apiService.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        department: formData.department
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Redirect to login page after successful signup
-        router.push('/login');
-      } else {
-        setError(data.message || 'Signup failed');
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
+      
+      // Redirect to login page after successful signup
+      router.push('/login');
+    } catch (err: any) {
+      setError(err.message || 'Signup failed. Please try again.');
     }
 
     setIsLoading(false);

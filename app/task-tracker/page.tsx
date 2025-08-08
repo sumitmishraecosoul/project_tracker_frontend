@@ -1,33 +1,100 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import AddTaskModal from '../../components/AddTaskModal';
 import EditUserTaskModal from '../../components/EditUserTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
-import { usersData, userTasksData, UserTask } from '../../lib/data';
+import { apiService } from '../../lib/api-service';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+}
+
+interface UserTask {
+  id: string;
+  userId: string;
+  date: string;
+  typeOfWork: string;
+  workDescription: string;
+  project: string;
+  task: string;
+  frequency: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
+  status: 'Pending' | 'In Progress' | 'Completed';
+  hoursSpent?: number;
+  notes?: string;
+}
 
 export default function TaskTracker() {
-  const [activeUserId, setActiveUserId] = useState('1');
-  const [userTasks, setUserTasks] = useState(userTasksData);
+  const [users, setUsers] = useState<User[]>([]);
+  const [activeUserId, setActiveUserId] = useState('');
+  const [userTasks, setUserTasks] = useState<UserTask[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<UserTask | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'daily' | 'weekly' | 'monthly' | 'adhoc'>('daily');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const activeUser = usersData.find(user => user.id === activeUserId);
-  const filteredTasks = userTasks
-    .filter(task => task.userId === activeUserId)
-    .filter(task => task.frequency.toLowerCase() === activeFilter);
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  const handleAddTask = (newTask: Omit<UserTask, 'id'>) => {
-    const task: UserTask = {
-      ...newTask,
-      id: Date.now().toString()
-    };
-    setUserTasks([...userTasks, task]);
-    setIsAddModalOpen(false);
+  useEffect(() => {
+    if (activeUserId) {
+      fetchUserTasks();
+    }
+  }, [activeUserId, activeFilter]);
+
+  const fetchUsers = async () => {
+    try {
+      const data = await apiService.getUsers();
+      setUsers(data);
+      if (data.length > 0 && !activeUserId) {
+        setActiveUserId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      setError('Failed to load users');
+    }
+  };
+
+  const fetchUserTasks = async () => {
+    if (!activeUserId) return;
+    
+    setLoading(true);
+    try {
+      const data = await apiService.getUserTasks({ 
+        userId: activeUserId,
+        typeOfWork: activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)
+      });
+      setUserTasks(data);
+    } catch (error) {
+      console.error('Failed to fetch user tasks:', error);
+      setError('Failed to load tasks');
+    }
+    setLoading(false);
+  };
+
+  const activeUser = users.find(user => user.id === activeUserId);
+  const filteredTasks = userTasks.filter(task => 
+    task.frequency.toLowerCase() === activeFilter
+  );
+
+  const handleAddTask = async (newTask: Omit<UserTask, 'id'>) => {
+    try {
+      await apiService.createUserTask(newTask);
+      await fetchUserTasks();
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error('Failed to add task:', error);
+      setError('Failed to add task');
+    }
   };
 
   const handleEditTask = (task: UserTask) => {
@@ -35,12 +102,26 @@ export default function TaskTracker() {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateTask = (updatedTask: UserTask) => {
-    setUserTasks(userTasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    ));
-    setIsEditModalOpen(false);
-    setEditingTask(null);
+  const handleUpdateTask = async (updatedTask: UserTask) => {
+    try {
+      await apiService.updateUserTask(updatedTask.id, updatedTask);
+      await fetchUserTasks();
+      setIsEditModalOpen(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      setError('Failed to update task');
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await apiService.deleteUserTask(taskId);
+      await fetchUserTasks();
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      setError('Failed to delete task');
+    }
   };
 
   return (
@@ -54,11 +135,17 @@ export default function TaskTracker() {
               <p className="text-gray-600">Manage individual tasks and track progress</p>
             </div>
 
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Members</h2>
                 <div className="flex flex-wrap gap-2">
-                  {usersData.map((user) => (
+                  {users.map((user) => (
                     <button
                       key={user.id}
                       onClick={() => setActiveUserId(user.id)}
@@ -117,50 +204,71 @@ export default function TaskTracker() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type of Work</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work Description</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project for Task</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredTasks.map((task) => (
-                        <tr key={task.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(task.date).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.typeOfWork}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.workDescription}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.projectForTask}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              {task.frequency}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              task.status === 'Completed' 
-                                ? 'bg-green-100 text-green-800'
-                                : task.status === 'In Progress'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {task.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => handleEditTask(task)}
-                              className="text-blue-600 hover:text-blue-900 cursor-pointer whitespace-nowrap"
-                            >
-                              <i className="ri-edit-line w-4 h-4"></i>
-                            </button>
+                      {loading ? (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                            Loading tasks...
                           </td>
                         </tr>
-                      ))}
-                      {filteredTasks.length === 0 && (
+                      ) : filteredTasks.length > 0 ? (
+                        filteredTasks.map((task) => (
+                          <tr key={task.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {new Date(task.date).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.typeOfWork}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.workDescription}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.project}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                {task.frequency}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                task.status === 'Completed' 
+                                  ? 'bg-green-100 text-green-800'
+                                  : task.status === 'In Progress'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {task.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {task.hoursSpent || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditTask(task)}
+                                  className="text-blue-600 hover:text-blue-900 cursor-pointer whitespace-nowrap"
+                                  title="Edit Task"
+                                >
+                                  <i className="ri-edit-line w-4 h-4"></i>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTask(task.id)}
+                                  className="text-red-600 hover:text-red-900 cursor-pointer whitespace-nowrap"
+                                  title="Delete Task"
+                                >
+                                  <i className="ri-delete-bin-line w-4 h-4"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
                         <tr>
-                          <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                             No {activeFilter} tasks found for this user.
                           </td>
                         </tr>

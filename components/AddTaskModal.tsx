@@ -1,7 +1,31 @@
 'use client';
 
-import { useState } from 'react';
-import { UserTask } from '../lib/data';
+import { useState, useEffect } from 'react';
+import { apiService } from '../lib/api-service';
+
+interface UserTask {
+  id: string;
+  userId: string;
+  date: string;
+  typeOfWork: string;
+  workDescription: string;
+  project: string;
+  task: string;
+  frequency: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
+  status: 'Pending' | 'In Progress' | 'Completed';
+  hoursSpent?: number;
+  notes?: string;
+}
+
+interface Project {
+  id: string;
+  title: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+}
 
 interface AddTaskModalProps {
   userId: string;
@@ -14,20 +38,59 @@ export default function AddTaskModal({ userId, onAdd, onClose }: AddTaskModalPro
     date: new Date().toISOString().split('T')[0],
     typeOfWork: '',
     workDescription: '',
-    projectForTask: '',
+    project: '',
+    task: '',
     frequency: 'Daily' as 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc',
-    status: 'Pending' as 'Pending' | 'In Progress' | 'Completed'
+    status: 'Pending' as 'Pending' | 'In Progress' | 'Completed',
+    hoursSpent: 0,
+    notes: ''
   });
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    if (formData.project) {
+      fetchProjectTasks(formData.project);
+    } else {
+      setTasks([]);
+    }
+  }, [formData.project]);
+
+  const fetchProjects = async () => {
+    try {
+      const data = await apiService.getProjects();
+      setProjects(data);
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    }
+  };
+
+  const fetchProjectTasks = async (projectId: string) => {
+    try {
+      const data = await apiService.getProjectTasks(projectId);
+      setTasks(data);
+    } catch (error) {
+      console.error('Failed to fetch project tasks:', error);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     onAdd({
       userId,
       ...formData
     });
+    setLoading(false);
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -85,15 +148,38 @@ export default function AddTaskModal({ userId, onAdd, onClose }: AddTaskModalPro
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Project for Task</label>
-              <input
-                type="text"
-                value={formData.projectForTask}
-                onChange={(e) => handleInputChange('projectForTask', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Project name or reference"
+              <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
+              <select
+                value={formData.project}
+                onChange={(e) => handleInputChange('project', e.target.value)}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
-              />
+              >
+                <option value="">Select a project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Task</label>
+              <select
+                value={formData.task}
+                onChange={(e) => handleInputChange('task', e.target.value)}
+                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+                disabled={!formData.project}
+              >
+                <option value="">Select a task</option>
+                {tasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -122,6 +208,31 @@ export default function AddTaskModal({ userId, onAdd, onClose }: AddTaskModalPro
                 <option value="Completed">Completed</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Hours Spent</label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={formData.hoursSpent}
+                onChange={(e) => handleInputChange('hoursSpent', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                rows={2}
+                maxLength={200}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Additional notes..."
+              />
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 mt-8">
@@ -134,9 +245,10 @@ export default function AddTaskModal({ userId, onAdd, onClose }: AddTaskModalPro
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Add Task
+              {loading ? 'Adding...' : 'Add Task'}
             </button>
           </div>
         </form>

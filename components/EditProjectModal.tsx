@@ -1,15 +1,24 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { apiService } from '../lib/api-service';
 
 interface Project {
   id: string;
   title: string;
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
-  createdDate: string;
+  priority: 'Low' | 'Medium' | 'High';
+  startDate: string;
   dueDate: string;
+  assignedTo?: string[];
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
 }
 
 interface EditProjectModalProps {
@@ -20,14 +29,40 @@ interface EditProjectModalProps {
 
 export default function EditProjectModal({ project, onSave, onClose }: EditProjectModalProps) {
   const [formData, setFormData] = useState<Project>(project);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const data = await apiService.getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     onSave(formData);
+    setLoading(false);
   };
 
-  const handleInputChange = (field: keyof Project, value: string) => {
+  const handleInputChange = (field: keyof Project, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleUserToggle = (userId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      assignedTo: prev.assignedTo?.includes(userId)
+        ? prev.assignedTo.filter(id => id !== userId)
+        : [...(prev.assignedTo || []), userId]
+    }));
   };
 
   return (
@@ -70,28 +105,76 @@ export default function EditProjectModal({ project, onSave, onClose }: EditProje
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value as 'Active' | 'Completed' | 'On Hold')}
-                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Active">Active</option>
-                <option value="On Hold">On Hold</option>
-                <option value="Completed">Completed</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value as 'Active' | 'Completed' | 'On Hold')}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Active">Active</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => handleInputChange('priority', e.target.value as 'Low' | 'Medium' | 'High')}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => handleInputChange('startDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                <input
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => handleInputChange('dueDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Assign Team Members</label>
+              <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
+                {users.map((user) => (
+                  <label key={user.id} className="flex items-center space-x-3 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.assignedTo?.includes(user.id) || false}
+                      onChange={() => handleUserToggle(user.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                      <div className="text-xs text-gray-500">{user.email}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -105,9 +188,10 @@ export default function EditProjectModal({ project, onSave, onClose }: EditProje
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Changes
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

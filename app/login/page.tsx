@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiService } from '../../lib/api-service';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -33,29 +34,14 @@ export default function LoginPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store user session and token
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        router.push('/');
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
+      const data = await apiService.login(formData);
+      
+      // Store user session and token
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
     }
 
     setIsLoading(false);
