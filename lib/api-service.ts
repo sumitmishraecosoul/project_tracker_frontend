@@ -1,20 +1,100 @@
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+interface User {
+  _id: string;
+  id?: string;
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+}
+
+interface Task {
+  _id: string;
+  id: string;
+  projectId: string;
+  task: string;
+  description?: string;
+  taskType?: string;
+  priority: string;
+  status: string;
+  assignedTo: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  reporter: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  startDate?: string;
+  eta: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  remark?: string;
+  roadBlock?: string;
+  supportNeeded?: string;
+  labels?: string[];
+  attachments?: string[];
+  relatedTasks?: string[];
+  parentTask?: string;
+  sprint?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 class ApiService {
   private getAuthHeader() {
-    const token = localStorage.getItem('token');
+    const stored = localStorage.getItem('token') || '';
+    const authValue = stored
+      ? stored.startsWith('Bearer ') ? stored : `Bearer ${stored}`
+      : '';
     return {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      ...(authValue && { 'Authorization': authValue })
     };
   }
 
   private async handleResponse(response: Response) {
+    console.log('API Response Status:', response.status);
+    console.log('API Response OK:', response.ok);
+    console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
+    
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'API request failed' }));
-      throw new Error(error.message || 'API request failed');
+      let errorMessage = 'API request failed';
+      try {
+        const errorData = await response.json();
+        console.log('API Error Data:', errorData);
+        errorMessage = errorData.message || errorData.error || errorData.msg || 'API request failed';
+      } catch (parseError) {
+        console.log('Failed to parse error response:', parseError);
+        const errorText = await response.text();
+        console.log('Raw error response:', errorText);
+        errorMessage = errorText || 'API request failed';
+      }
+      
+      // If token invalid/expired, clear storage to force re-login
+      if (
+        response.status === 401 ||
+        /token/i.test(errorMessage || '')
+      ) {
+        try {
+          localStorage.removeItem('token');
+          localStorage.removeItem('currentUser');
+        } catch {}
+      }
+      throw new Error(errorMessage);
     }
-    return response.json();
+    
+    try {
+      const data = await response.json();
+      console.log('API Success Response:', data);
+      return data;
+    } catch (parseError) {
+      console.log('Failed to parse success response:', parseError);
+      throw new Error('Failed to parse API response');
+    }
   }
 
   // Authentication APIs
@@ -59,11 +139,18 @@ class ApiService {
   }
 
   // User APIs
-  async getUsers() {
-    const response = await fetch(`${API_BASE_URL}/api/users`, {
-      headers: this.getAuthHeader()
-    });
-    return this.handleResponse(response);
+  async getUsers(): Promise<User[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        headers: this.getAuthHeader()
+      });
+      const data = await this.handleResponse(response);
+      console.log('API Service - getUsers response:', data);
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('API Service - getUsers error:', error);
+      throw error;
+    }
   }
 
   async getUserById(id: string) {
@@ -142,8 +229,22 @@ class ApiService {
   }
 
   // Task APIs
-  async getTasks() {
-    const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+  async getTasks(): Promise<Task[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+        headers: this.getAuthHeader()
+      });
+      const data = await this.handleResponse(response);
+      console.log('API Service - getTasks response:', data);
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.error('API Service - getTasks error:', error);
+      throw error;
+    }
+  }
+
+  async getTasksByProject(projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/tasks?projectId=${projectId}`, {
       headers: this.getAuthHeader()
     });
     return this.handleResponse(response);
@@ -160,9 +261,9 @@ class ApiService {
     projectId: string;
     task: string;
     description?: string;
-    taskType: string;
-    priority: string;
+    taskType?: string;
     status: string;
+    priority: string;
     assignedTo: string;
     reporter: string;
     startDate?: string;
@@ -178,12 +279,32 @@ class ApiService {
     parentTask?: string;
     sprint?: string;
   }) {
-    const response = await fetch(`${API_BASE_URL}/api/tasks`, {
-      method: 'POST',
-      headers: this.getAuthHeader(),
-      body: JSON.stringify(taskData)
-    });
-    return this.handleResponse(response);
+    console.log('API Service - createTask called with:', taskData);
+    console.log('API Service - URL:', `${API_BASE_URL}/api/tasks`);
+    console.log('API Service - Headers:', this.getAuthHeader());
+    console.log('API Service - Request Body:', JSON.stringify(taskData, null, 2));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+        method: 'POST',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify(taskData)
+      });
+      
+      console.log('API Service - Response status:', response.status);
+      console.log('API Service - Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Service - Error response body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      return this.handleResponse(response);
+    } catch (fetchError) {
+      console.error('API Service - Fetch error:', fetchError);
+      throw fetchError;
+    }
   }
 
   async updateTask(id: string, taskData: any) {

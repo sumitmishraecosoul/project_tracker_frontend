@@ -3,45 +3,16 @@
 import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
-interface UserTask {
-  id: string;
-  userId: string;
-  date: string;
-  typeOfWork: string;
-  workDescription: string;
-  project: string;
-  task: string;
-  frequency: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  status: 'Pending' | 'In Progress' | 'Completed';
-  hoursSpent?: number;
-  notes?: string;
-}
-
 interface Project {
   id: string;
   title: string;
 }
 
-interface Task {
-  id: string;
-  task: string;
-  description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
-  assignedTo: string;
-  reporter: string;
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  projectId: string;
-}
-
-interface AddUserTaskModalProps {
-  userId: string;
-  onAdd: (task: Omit<UserTask, 'id'>) => void;
-  onClose: () => void;
+interface User {
+  _id: string;
+  id?: string;
+  name: string;
+  email: string;
 }
 
 interface NewTaskData {
@@ -67,23 +38,17 @@ interface NewTaskData {
   sprint?: string;
 }
 
-export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTaskModalProps) {
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    typeOfWork: '',
-    workDescription: '',
-    project: '',
-    task: '',
-    frequency: 'Daily' as 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc',
-    status: 'Pending' as 'Pending' | 'In Progress' | 'Completed',
-    hoursSpent: 0,
-    notes: ''
-  });
+interface AddUserTaskModalProps {
+  userId: string;
+  onAdd: (task: any) => void;
+  onClose: () => void;
+}
 
+export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTaskModalProps) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [newTaskData, setNewTaskData] = useState<NewTaskData>({
     projectId: '',
     task: '',
@@ -109,17 +74,23 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
 
   useEffect(() => {
     fetchProjects();
+    fetchUsers();
+    getCurrentUser();
   }, []);
 
+  // Set default reporter when current user is available
   useEffect(() => {
-    if (formData.project) {
-      fetchProjectTasks(formData.project);
-      // Update newTaskData with selected project
-      setNewTaskData(prev => ({ ...prev, projectId: formData.project }));
-    } else {
-      setTasks([]);
+    if (currentUser && currentUser._id && !newTaskData.reporter) {
+      setNewTaskData(prev => ({ ...prev, reporter: currentUser._id }));
     }
-  }, [formData.project]);
+  }, [currentUser, newTaskData.reporter]);
+
+  const getCurrentUser = () => {
+    const user = localStorage.getItem('currentUser');
+    if (user) {
+      setCurrentUser(JSON.parse(user));
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -144,55 +115,13 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
     }
   };
 
-  const fetchProjectTasks = async (projectId: string) => {
+  const fetchUsers = async () => {
     try {
-      console.log('Fetching tasks for project:', projectId);
-      // Try project-specific endpoint first
-      let data = await apiService.getProjectTasks(projectId);
-      console.log('Fetched tasks from project endpoint:', data);
-      
-      // If no tasks found, try fetching all tasks and filtering
-      if (!data || data.length === 0) {
-        console.log('No tasks found from project endpoint, trying all tasks...');
-        const allTasks = await apiService.getTasks();
-        console.log('All tasks:', allTasks);
-        data = allTasks.filter((task: any) => task.projectId === projectId);
-        console.log('Filtered tasks for project:', data);
-      }
-      
-      // Ensure data is an array
-      const tasksData = Array.isArray(data) ? data : [];
-      setTasks(tasksData as Task[]);
+      const data = await apiService.getUsers();
+      setUsers(data as User[]);
     } catch (error) {
-      console.error('Failed to fetch project tasks:', error);
-      // Fallback: try to get all tasks and filter
-      try {
-        console.log('Trying fallback: fetch all tasks...');
-        const allTasks = await apiService.getTasks();
-        // Ensure allTasks is an array
-        const allTasksArray = Array.isArray(allTasks) ? allTasks : [];
-        const filteredTasks = allTasksArray.filter((task: any) => task.projectId === projectId);
-        console.log('Fallback filtered tasks:', filteredTasks);
-        setTasks(filteredTasks as Task[]);
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-        setTasks([]);
-      }
+      console.error('Failed to fetch users:', error);
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    onAdd({
-      userId,
-      ...formData
-    });
-    setLoading(false);
-  };
-
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleNewTaskInputChange = (field: keyof NewTaskData, value: any) => {
@@ -202,33 +131,86 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
   const handleCreateTask = async () => {
     try {
       setLoading(true);
-      console.log('Creating new task:', newTaskData);
+      console.log('Creating new task with data:', newTaskData);
+      
+      // Validate required fields
+      if (!newTaskData.projectId || !newTaskData.task || !newTaskData.assignedTo || !newTaskData.reporter || !newTaskData.eta) {
+        console.error('Missing required fields:', {
+          projectId: newTaskData.projectId,
+          task: newTaskData.task,
+          assignedTo: newTaskData.assignedTo,
+          reporter: newTaskData.reporter,
+          eta: newTaskData.eta
+        });
+        alert('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and ETA');
+        setLoading(false);
+        return;
+      }
+      
+      // Additional validation for user IDs
+      if (!newTaskData.assignedTo || !newTaskData.reporter) {
+        console.error('Invalid user IDs:', {
+          assignedTo: newTaskData.assignedTo,
+          reporter: newTaskData.reporter
+        });
+        alert('Please select valid users for Assigned To and Reporter');
+        setLoading(false);
+        return;
+      }
+      
+      // Map the data to match backend expectations
+      const taskDataForAPI = {
+        projectId: newTaskData.projectId,
+        task: newTaskData.task,
+        description: newTaskData.description || '',
+        taskType: newTaskData.taskType,
+        status: newTaskData.status,
+        priority: newTaskData.priority,
+        assignedTo: newTaskData.assignedTo,
+        reporter: newTaskData.reporter,
+        startDate: newTaskData.startDate,
+        eta: newTaskData.eta,
+        estimatedHours: newTaskData.estimatedHours || 0,
+        actualHours: newTaskData.actualHours || 0,
+        remark: newTaskData.remark || '',
+        roadBlock: newTaskData.roadBlock || '',
+        supportNeeded: newTaskData.supportNeeded || '',
+        labels: newTaskData.labels || [],
+        attachments: newTaskData.attachments || [],
+        relatedTasks: newTaskData.relatedTasks || [],
+        parentTask: newTaskData.parentTask || '',
+        sprint: newTaskData.sprint || ''
+      };
+      
+      console.log('Task data for API:', taskDataForAPI);
+      console.log('Users available:', users);
+      console.log('Selected assignedTo:', newTaskData.assignedTo);
+      console.log('Selected reporter:', newTaskData.reporter);
+      
+      // Find the selected users to verify the data
+      const assignedUser = users.find(u => u._id === newTaskData.assignedTo);
+      const reporterUser = users.find(u => u._id === newTaskData.reporter);
+      console.log('Assigned user found:', assignedUser);
+      console.log('Reporter user found:', reporterUser);
       
       // Create the new task
-      const createdTask = await apiService.createTask(newTaskData);
+      const createdTask = await apiService.createTask(taskDataForAPI);
       console.log('Task created successfully:', createdTask);
       
-      // Refresh the tasks list for the current project
-      await fetchProjectTasks(newTaskData.projectId);
+      // Call the onAdd callback with the created task
+      onAdd(createdTask);
       
-      // Set the newly created task as selected
-      setFormData(prev => ({ ...prev, task: createdTask.id }));
-      
-      // Hide the create task form
-      setShowCreateTask(false);
-      
-      // Reset new task data
-      setNewTaskData(prev => ({
-        ...prev,
-        task: '',
-        description: '',
-        assignedTo: '',
-        reporter: ''
-      }));
+      // Close the modal
+      onClose();
       
     } catch (error) {
       console.error('Failed to create task:', error);
-      alert('Failed to create task. Please try again.');
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error: error
+      });
+      alert(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -236,10 +218,10 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Add New User Task</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Create New Task</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -249,49 +231,13 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
           </div>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6">
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateTask(); }} className="p-6">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-              <input
-                type="date"
-                value={formData.date}
-                onChange={(e) => handleInputChange('date', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type of Work</label>
-              <input
-                type="text"
-                value={formData.typeOfWork}
-                onChange={(e) => handleInputChange('typeOfWork', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., Development, Design, Testing"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Work Description</label>
-              <textarea
-                value={formData.workDescription}
-                onChange={(e) => handleInputChange('workDescription', e.target.value)}
-                rows={3}
-                maxLength={500}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Describe the work performed..."
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Project *</label>
               <select
-                value={formData.project}
-                onChange={(e) => handleInputChange('project', e.target.value)}
+                value={newTaskData.projectId}
+                onChange={(e) => handleNewTaskInputChange('projectId', e.target.value)}
                 className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               >
@@ -304,272 +250,210 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
               </select>
             </div>
 
-                         <div>
-               <label className="block text-sm font-medium text-gray-700 mb-2">Task</label>
-               <select
-                 value={formData.task}
-                 onChange={(e) => handleInputChange('task', e.target.value)}
-                 className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                 required
-                 disabled={!formData.project}
-               >
-                 <option value="">Select a task</option>
-                 {(!Array.isArray(tasks) || tasks.length === 0) && formData.project ? (
-                   <option value="" disabled>No tasks found for this project</option>
-                 ) : (
-                   Array.isArray(tasks) && tasks.map((task) => (
-                     <option key={task.id} value={task.id}>
-                       {task.task} - {task.status}
-                     </option>
-                   ))
-                 )}
-               </select>
-               {formData.project && (
-                 <div className="mt-2">
-                   {(!Array.isArray(tasks) || tasks.length === 0) && (
-                     <p className="text-sm text-gray-500 mb-2">
-                       {!Array.isArray(tasks) ? 'Error loading tasks' : 'No tasks found for this project.'}
-                     </p>
-                   )}
-                   <button
-                     type="button"
-                     onClick={() => setShowCreateTask(true)}
-                     className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
-                   >
-                     Create New Task
-                   </button>
-                 </div>
-               )}
-             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
-              <select
-                value={formData.frequency}
-                onChange={(e) => handleInputChange('frequency', e.target.value)}
-                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Daily">Daily</option>
-                <option value="Weekly">Weekly</option>
-                <option value="Monthly">Monthly</option>
-                <option value="Adhoc">Adhoc</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Hours Spent</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Task Name *</label>
               <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={formData.hoursSpent}
-                onChange={(e) => handleInputChange('hoursSpent', parseFloat(e.target.value) || 0)}
+                type="text"
+                value={newTaskData.task}
+                onChange={(e) => handleNewTaskInputChange('task', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
+                placeholder="Enter task name"
+                required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
               <textarea
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                rows={2}
-                maxLength={200}
+                value={newTaskData.description}
+                onChange={(e) => handleNewTaskInputChange('description', e.target.value)}
+                rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Additional notes..."
+                placeholder="Enter task description..."
               />
             </div>
-                     </div>
 
-           {/* New Task Creation Form */}
-           {showCreateTask && (
-             <div className="mt-8 p-4 border border-gray-200 rounded-lg bg-gray-50">
-               <div className="flex items-center justify-between mb-4">
-                 <h3 className="text-lg font-medium text-gray-900">Create New Task</h3>
-                 <button
-                   type="button"
-                   onClick={() => setShowCreateTask(false)}
-                   className="text-gray-400 hover:text-gray-600"
-                 >
-                   <i className="ri-close-line w-5 h-5"></i>
-                 </button>
-               </div>
-               
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Task Name *</label>
-                   <input
-                     type="text"
-                     value={newTaskData.task}
-                     onChange={(e) => handleNewTaskInputChange('task', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     placeholder="Enter task name"
-                     required
-                   />
-                 </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+                <select
+                  value={newTaskData.taskType}
+                  onChange={(e) => handleNewTaskInputChange('taskType', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Feature">Feature</option>
+                  <option value="Bug">Bug</option>
+                  <option value="Enhancement">Enhancement</option>
+                  <option value="Documentation">Documentation</option>
+                  <option value="Research">Research</option>
+                </select>
+              </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Task Type</label>
-                   <select
-                     value={newTaskData.taskType}
-                     onChange={(e) => handleNewTaskInputChange('taskType', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                   >
-                     <option value="Feature">Feature</option>
-                     <option value="Bug">Bug</option>
-                     <option value="Enhancement">Enhancement</option>
-                     <option value="Documentation">Documentation</option>
-                     <option value="Research">Research</option>
-                   </select>
-                 </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <select
+                  value={newTaskData.priority}
+                  onChange={(e) => handleNewTaskInputChange('priority', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                   <select
-                     value={newTaskData.priority}
-                     onChange={(e) => handleNewTaskInputChange('priority', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                   >
-                     <option value="Low">Low</option>
-                     <option value="Medium">Medium</option>
-                     <option value="High">High</option>
-                     <option value="Critical">Critical</option>
-                   </select>
-                 </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={newTaskData.status}
+                  onChange={(e) => handleNewTaskInputChange('status', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="To Do">To Do</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Blocked">Blocked</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                   <select
-                     value={newTaskData.status}
-                     onChange={(e) => handleNewTaskInputChange('status', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                   >
-                     <option value="To Do">To Do</option>
-                     <option value="In Progress">In Progress</option>
-                     <option value="Completed">Completed</option>
-                     <option value="Blocked">Blocked</option>
-                     <option value="On Hold">On Hold</option>
-                   </select>
-                 </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sprint</label>
+                <input
+                  type="text"
+                  value={newTaskData.sprint}
+                  onChange={(e) => handleNewTaskInputChange('sprint', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter sprint name"
+                />
+              </div>
+            </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To *</label>
-                   <input
-                     type="text"
-                     value={newTaskData.assignedTo}
-                     onChange={(e) => handleNewTaskInputChange('assignedTo', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     placeholder="Enter assignee name"
-                     required
-                   />
-                 </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To *</label>
+                <select
+                  value={newTaskData.assignedTo}
+                  onChange={(e) => handleNewTaskInputChange('assignedTo', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select a user</option>
+                  {users.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Reporter *</label>
-                   <input
-                     type="text"
-                     value={newTaskData.reporter}
-                     onChange={(e) => handleNewTaskInputChange('reporter', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     placeholder="Enter reporter name"
-                     required
-                   />
-                 </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reporter *</label>
+                <select
+                  value={newTaskData.reporter}
+                  onChange={(e) => handleNewTaskInputChange('reporter', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select a user</option>
+                  {users.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                   <input
-                     type="date"
-                     value={newTaskData.startDate}
-                     onChange={(e) => handleNewTaskInputChange('startDate', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                   />
-                 </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={newTaskData.startDate}
+                  onChange={(e) => handleNewTaskInputChange('startDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">ETA *</label>
-                   <input
-                     type="date"
-                     value={newTaskData.eta}
-                     onChange={(e) => handleNewTaskInputChange('eta', e.target.value)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     required
-                   />
-                 </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ETA *</label>
+                <input
+                  type="date"
+                  value={newTaskData.eta}
+                  onChange={(e) => handleNewTaskInputChange('eta', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+            </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
-                   <input
-                     type="number"
-                     min="0"
-                     step="0.5"
-                     value={newTaskData.estimatedHours}
-                     onChange={(e) => handleNewTaskInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     placeholder="0"
-                   />
-                 </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={newTaskData.estimatedHours}
+                  onChange={(e) => handleNewTaskInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
 
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Actual Hours</label>
-                   <input
-                     type="number"
-                     min="0"
-                     step="0.5"
-                     value={newTaskData.actualHours}
-                     onChange={(e) => handleNewTaskInputChange('actualHours', parseFloat(e.target.value) || 0)}
-                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     placeholder="0"
-                   />
-                 </div>
-               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={newTaskData.actualHours}
+                  onChange={(e) => handleNewTaskInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
 
-               <div className="mt-4">
-                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                 <textarea
-                   value={newTaskData.description}
-                   onChange={(e) => handleNewTaskInputChange('description', e.target.value)}
-                   rows={3}
-                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                   placeholder="Enter task description..."
-                 />
-               </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Remark</label>
+              <textarea
+                value={newTaskData.remark}
+                onChange={(e) => handleNewTaskInputChange('remark', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Enter any remarks"
+              />
+            </div>
 
-               <div className="mt-4 flex justify-end space-x-3">
-                 <button
-                   type="button"
-                   onClick={() => setShowCreateTask(false)}
-                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                 >
-                   Cancel
-                 </button>
-                 <button
-                   type="button"
-                   onClick={handleCreateTask}
-                   disabled={loading || !newTaskData.task || !newTaskData.assignedTo || !newTaskData.reporter}
-                   className="px-4 py-2 bg-green-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                 >
-                   {loading ? 'Creating...' : 'Create Task'}
-                 </button>
-               </div>
-             </div>
-           )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Road Block</label>
+              <textarea
+                value={newTaskData.roadBlock}
+                onChange={(e) => handleNewTaskInputChange('roadBlock', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Describe any roadblocks"
+              />
+            </div>
 
-           <div className="flex justify-end space-x-3 mt-8">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Support Needed</label>
+              <textarea
+                value={newTaskData.supportNeeded}
+                onChange={(e) => handleNewTaskInputChange('supportNeeded', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Describe support needed"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-8">
             <button
               type="button"
               onClick={onClose}
@@ -579,10 +463,10 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !newTaskData.task || !newTaskData.assignedTo || !newTaskData.reporter || !newTaskData.projectId}
               className="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Adding...' : 'Add Task'}
+              {loading ? 'Creating...' : 'Create Task'}
             </button>
           </div>
         </form>

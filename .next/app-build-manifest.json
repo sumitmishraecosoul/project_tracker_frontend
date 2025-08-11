@@ -35,6 +35,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/task-tracker/page.js"
+    ],
+    "/project-tracker/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/project-tracker/[id]/page.js"
     ]
   }
 }
