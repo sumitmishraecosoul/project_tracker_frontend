@@ -24,7 +24,18 @@ interface Project {
 
 interface Task {
   id: string;
-  title: string;
+  task: string;
+  description?: string;
+  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+  assignedTo: string;
+  reporter: string;
+  startDate?: string;
+  eta: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  projectId: string;
 }
 
 interface EditUserTaskModalProps {
@@ -33,11 +44,57 @@ interface EditUserTaskModalProps {
   onClose: () => void;
 }
 
+interface NewTaskData {
+  projectId: string;
+  task: string;
+  description?: string;
+  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+  assignedTo: string;
+  reporter: string;
+  startDate?: string;
+  eta: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  remark?: string;
+  roadBlock?: string;
+  supportNeeded?: string;
+  labels?: string[];
+  attachments?: string[];
+  relatedTasks?: string[];
+  parentTask?: string;
+  sprint?: string;
+}
+
 export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTaskModalProps) {
   const [formData, setFormData] = useState<UserTask>(task);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [newTaskData, setNewTaskData] = useState<NewTaskData>({
+    projectId: '',
+    task: '',
+    description: '',
+    taskType: 'Feature',
+    priority: 'Medium',
+    status: 'To Do',
+    assignedTo: '',
+    reporter: '',
+    startDate: new Date().toISOString().split('T')[0],
+    eta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+    estimatedHours: 0,
+    actualHours: 0,
+    remark: '',
+    roadBlock: '',
+    supportNeeded: '',
+    labels: [],
+    attachments: [],
+    relatedTasks: [],
+    parentTask: '',
+    sprint: ''
+  });
 
   useEffect(() => {
     fetchProjects();
@@ -46,6 +103,8 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
   useEffect(() => {
     if (formData.project) {
       fetchProjectTasks(formData.project);
+      // Update newTaskData with selected project
+      setNewTaskData(prev => ({ ...prev, projectId: formData.project }));
     } else {
       setTasks([]);
     }
@@ -54,18 +113,60 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
   const fetchProjects = async () => {
     try {
       const data = await apiService.getProjects();
-      setProjects(data);
+      console.log('EditUserTaskModal - Fetched projects data:', data);
+      
+      // Ensure data is an array - handle different response formats
+      let projectsData = [];
+      if (Array.isArray(data)) {
+        projectsData = data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.projects)) {
+        projectsData = data.projects;
+      } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
+        projectsData = data.data;
+      }
+      console.log('EditUserTaskModal - Processed projects data:', projectsData);
+      
+      setProjects(projectsData as Project[]);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
+      setProjects([]); // Set empty array on error
     }
   };
 
   const fetchProjectTasks = async (projectId: string) => {
     try {
-      const data = await apiService.getProjectTasks(projectId);
-      setTasks(data);
+      console.log('Fetching tasks for project:', projectId);
+      // Try project-specific endpoint first
+      let data = await apiService.getProjectTasks(projectId);
+      console.log('Fetched tasks from project endpoint:', data);
+      
+      // If no tasks found, try fetching all tasks and filtering
+      if (!data || data.length === 0) {
+        console.log('No tasks found from project endpoint, trying all tasks...');
+        const allTasks = await apiService.getTasks();
+        console.log('All tasks:', allTasks);
+        data = allTasks.filter((task: any) => task.projectId === projectId);
+        console.log('Filtered tasks for project:', data);
+      }
+      
+      // Ensure data is an array
+      const tasksData = Array.isArray(data) ? data : [];
+      setTasks(tasksData as Task[]);
     } catch (error) {
       console.error('Failed to fetch project tasks:', error);
+      // Fallback: try to get all tasks and filter
+      try {
+        console.log('Trying fallback: fetch all tasks...');
+        const allTasks = await apiService.getTasks();
+        // Ensure allTasks is an array
+        const allTasksArray = Array.isArray(allTasks) ? allTasks : [];
+        const filteredTasks = allTasksArray.filter((task: any) => task.projectId === projectId);
+        console.log('Fallback filtered tasks:', filteredTasks);
+        setTasks(filteredTasks as Task[]);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        setTasks([]);
+      }
     }
   };
 
@@ -78,6 +179,45 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
 
   const handleInputChange = (field: keyof UserTask, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNewTaskInputChange = (field: keyof NewTaskData, value: any) => {
+    setNewTaskData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateTask = async () => {
+    try {
+      setLoading(true);
+      console.log('Creating new task:', newTaskData);
+      
+      // Create the new task
+      const createdTask = await apiService.createTask(newTaskData);
+      console.log('Task created successfully:', createdTask);
+      
+      // Refresh the tasks list for the current project
+      await fetchProjectTasks(newTaskData.projectId);
+      
+      // Set the newly created task as selected
+      setFormData(prev => ({ ...prev, task: createdTask.id }));
+      
+      // Hide the create task form
+      setShowCreateTask(false);
+      
+      // Reset new task data
+      setNewTaskData(prev => ({
+        ...prev,
+        task: '',
+        description: '',
+        assignedTo: '',
+        reporter: ''
+      }));
+      
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      alert('Failed to create task. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -140,7 +280,7 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                 required
               >
                 <option value="">Select a project</option>
-                {projects.map((project) => (
+                {Array.isArray(projects) && projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.title}
                   </option>
@@ -158,12 +298,32 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                 disabled={!formData.project}
               >
                 <option value="">Select a task</option>
-                {tasks.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
+                {tasks.length === 0 && formData.project ? (
+                  <option value="" disabled>No tasks found for this project</option>
+                ) : (
+                  Array.isArray(tasks) && tasks.map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.task} - {task.status}
+                    </option>
+                  ))
+                )}
               </select>
+              {formData.project && (
+                <div className="mt-2">
+                  {(!Array.isArray(tasks) || tasks.length === 0) && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      {!Array.isArray(tasks) ? 'Error loading tasks' : 'No tasks found for this project.'}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateTask(true)}
+                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Create New Task
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -218,6 +378,180 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
               />
             </div>
           </div>
+
+          {/* New Task Creation Form */}
+          {showCreateTask && (
+            <div className="mt-8 p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Create New Task</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTask(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <i className="ri-close-line w-5 h-5"></i>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Task Name *</label>
+                  <input
+                    type="text"
+                    value={newTaskData.task}
+                    onChange={(e) => handleNewTaskInputChange('task', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter task name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Task Type</label>
+                  <select
+                    value={newTaskData.taskType}
+                    onChange={(e) => handleNewTaskInputChange('taskType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Feature">Feature</option>
+                    <option value="Bug">Bug</option>
+                    <option value="Enhancement">Enhancement</option>
+                    <option value="Documentation">Documentation</option>
+                    <option value="Research">Research</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <select
+                    value={newTaskData.priority}
+                    onChange={(e) => handleNewTaskInputChange('priority', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={newTaskData.status}
+                    onChange={(e) => handleNewTaskInputChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Blocked">Blocked</option>
+                    <option value="On Hold">On Hold</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To *</label>
+                  <input
+                    type="text"
+                    value={newTaskData.assignedTo}
+                    onChange={(e) => handleNewTaskInputChange('assignedTo', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter assignee name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reporter *</label>
+                  <input
+                    type="text"
+                    value={newTaskData.reporter}
+                    onChange={(e) => handleNewTaskInputChange('reporter', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter reporter name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={newTaskData.startDate}
+                    onChange={(e) => handleNewTaskInputChange('startDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ETA *</label>
+                  <input
+                    type="date"
+                    value={newTaskData.eta}
+                    onChange={(e) => handleNewTaskInputChange('eta', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={newTaskData.estimatedHours}
+                    onChange={(e) => handleNewTaskInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Actual Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={newTaskData.actualHours}
+                    onChange={(e) => handleNewTaskInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={newTaskData.description}
+                  onChange={(e) => handleNewTaskInputChange('description', e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  placeholder="Enter task description..."
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTask(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateTask}
+                  disabled={loading || !newTaskData.task || !newTaskData.assignedTo || !newTaskData.reporter}
+                  className="px-4 py-2 bg-green-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Creating...' : 'Create Task'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 mt-8">
             <button

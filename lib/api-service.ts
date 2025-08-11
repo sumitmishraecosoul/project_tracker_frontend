@@ -158,13 +158,25 @@ class ApiService {
 
   async createTask(taskData: {
     projectId: string;
-    title: string;
-    description: string;
-    status: string;
+    task: string;
+    description?: string;
+    taskType: string;
     priority: string;
+    status: string;
     assignedTo: string;
-    dueDate: string;
+    reporter: string;
+    startDate?: string;
+    eta: string;
     estimatedHours?: number;
+    actualHours?: number;
+    remark?: string;
+    roadBlock?: string;
+    supportNeeded?: string;
+    labels?: string[];
+    attachments?: string[];
+    relatedTasks?: string[];
+    parentTask?: string;
+    sprint?: string;
   }) {
     const response = await fetch(`${API_BASE_URL}/api/tasks`, {
       method: 'POST',

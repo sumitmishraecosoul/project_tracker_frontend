@@ -20,14 +20,25 @@ interface Project {
 interface Task {
   id: string;
   projectId: string;
-  title: string;
-  description: string;
-  status: 'Not Started' | 'In Progress' | 'Completed' | 'Blocked';
-  priority: 'Low' | 'Medium' | 'High';
+  task: string;
+  description?: string;
+  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
   assignedTo: string;
-  dueDate: string;
+  reporter: string;
+  startDate?: string;
+  eta: string;
   estimatedHours?: number;
   actualHours?: number;
+  remark?: string;
+  roadBlock?: string;
+  supportNeeded?: string;
+  labels: string[];
+  attachments: string[];
+  relatedTasks: string[];
+  parentTask?: string;
+  sprint?: string;
 }
 
 interface ProjectDetailProps {
@@ -177,7 +188,8 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ETA</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
@@ -188,8 +200,23 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {tasks.map((task) => (
                     <tr key={task.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.title}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(task.dueDate).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          task.taskType === 'Bug'
+                            ? 'bg-red-100 text-red-800'
+                            : task.taskType === 'Feature'
+                            ? 'bg-blue-100 text-blue-800'
+                            : task.taskType === 'Enhancement'
+                            ? 'bg-purple-100 text-purple-800'
+                            : task.taskType === 'Documentation'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {task.taskType}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(task.eta).toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           task.status === 'Completed' 
@@ -198,6 +225,8 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                             ? 'bg-yellow-100 text-yellow-800'
                             : task.status === 'Blocked'
                             ? 'bg-red-100 text-red-800'
+                            : task.status === 'On Hold'
+                            ? 'bg-orange-100 text-orange-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
                           {task.status}
@@ -205,8 +234,10 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.priority === 'High'
+                          task.priority === 'Critical'
                             ? 'bg-red-100 text-red-800'
+                            : task.priority === 'High'
+                            ? 'bg-orange-100 text-orange-800'
                             : task.priority === 'Medium'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-green-100 text-green-800'
@@ -230,7 +261,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                   ))}
                   {tasks.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                         No tasks found for this project.
                       </td>
                     </tr>

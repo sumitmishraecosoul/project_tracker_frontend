@@ -6,14 +6,25 @@ import { apiService } from '../lib/api-service';
 interface Task {
   id: string;
   projectId: string;
-  title: string;
-  description: string;
-  status: 'Not Started' | 'In Progress' | 'Completed' | 'Blocked';
-  priority: 'Low' | 'Medium' | 'High';
+  task: string;
+  description?: string;
+  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
   assignedTo: string;
-  dueDate: string;
+  reporter: string;
+  startDate?: string;
+  eta: string;
   estimatedHours?: number;
   actualHours?: number;
+  remark?: string;
+  roadBlock?: string;
+  supportNeeded?: string;
+  labels: string[];
+  attachments: string[];
+  relatedTasks: string[];
+  parentTask?: string;
+  sprint?: string;
 }
 
 interface User {
@@ -75,11 +86,11 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Task Title</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Task</label>
               <input
                 type="text"
-                value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
+                value={formData.task}
+                onChange={(e) => handleInputChange('task', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 required
               />
@@ -99,16 +110,17 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  value={formData.taskType}
+                  onChange={(e) => handleInputChange('taskType', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="Not Started">Not Started</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Blocked">Blocked</option>
+                  <option value="Feature">Feature</option>
+                  <option value="Bug">Bug</option>
+                  <option value="Enhancement">Enhancement</option>
+                  <option value="Documentation">Documentation</option>
+                  <option value="Research">Research</option>
                 </select>
               </div>
 
@@ -119,10 +131,40 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                   onChange={(e) => handleInputChange('priority', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
+                  <option value="Critical">Critical</option>
                   <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="To Do">To Do</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Blocked">Blocked</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reporter</label>
+                <input
+                  type="text"
+                  value={formData.reporter}
+                  onChange={(e) => handleInputChange('reporter', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter reporter name"
+                  required
+                />
               </div>
             </div>
 
@@ -143,15 +185,27 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={formData.startDate || ''}
+                  onChange={(e) => handleInputChange('startDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
+                <input
+                  type="date"
+                  value={formData.eta}
+                  onChange={(e) => handleInputChange('eta', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -180,6 +234,50 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                   placeholder="0"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Remark</label>
+              <textarea
+                value={formData.remark || ''}
+                onChange={(e) => handleInputChange('remark', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Enter any remarks"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Road Block</label>
+              <textarea
+                value={formData.roadBlock || ''}
+                onChange={(e) => handleInputChange('roadBlock', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Describe any roadblocks"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Support Needed</label>
+              <textarea
+                value={formData.supportNeeded || ''}
+                onChange={(e) => handleInputChange('supportNeeded', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Describe support needed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sprint</label>
+              <input
+                type="text"
+                value={formData.sprint || ''}
+                onChange={(e) => handleInputChange('sprint', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter sprint name"
+              />
             </div>
           </div>
 

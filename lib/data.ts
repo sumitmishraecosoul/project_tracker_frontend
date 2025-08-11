@@ -12,12 +12,24 @@ export interface Task {
   id: string;
   projectId: string;
   task: string;
-  eta: string;
-  status: 'Not Started' | 'In Progress' | 'Completed' | 'Blocked';
+  description?: string;
+  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
   assignedTo: string;
-  remark: string;
-  roadBlock: string;
-  supportNeeded: string;
+  reporter: string;
+  startDate?: string;
+  eta: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  remark?: string;
+  roadBlock?: string;
+  supportNeeded?: string;
+  labels: string[];
+  attachments: string[];
+  relatedTasks: string[];
+  parentTask?: string;
+  sprint?: string;
 }
 
 export interface User {
@@ -86,67 +98,127 @@ export const tasksData: Task[] = [
     id: '1',
     projectId: '1',
     task: 'Setup project structure and dependencies',
-    eta: '2024-02-01',
+    description: 'Initialize project with proper folder structure and install necessary dependencies',
+    taskType: 'Feature',
+    priority: 'High',
     status: 'Completed',
     assignedTo: 'John Doe',
+    reporter: 'Project Manager',
+    eta: '2024-02-01',
+    estimatedHours: 8,
+    actualHours: 6,
     remark: 'Initial setup complete',
     roadBlock: 'None',
-    supportNeeded: 'None'
+    supportNeeded: 'None',
+    labels: ['setup', 'dependencies'],
+    attachments: [],
+    relatedTasks: [],
+    sprint: 'Sprint 1'
   },
   {
     id: '2',
     projectId: '1',
     task: 'Design database schema',
-    eta: '2024-02-05',
+    description: 'Create comprehensive database schema for the e-commerce application',
+    taskType: 'Feature',
+    priority: 'High',
     status: 'In Progress',
     assignedTo: 'Jane Smith',
+    reporter: 'Project Manager',
+    eta: '2024-02-05',
+    estimatedHours: 16,
+    actualHours: 12,
     remark: 'Working on user table design',
     roadBlock: 'Waiting for requirements clarification',
-    supportNeeded: 'Database architect review'
+    supportNeeded: 'Database architect review',
+    labels: ['database', 'schema'],
+    attachments: [],
+    relatedTasks: ['1'],
+    sprint: 'Sprint 1'
   },
   {
     id: '3',
     projectId: '1',
     task: 'Implement user authentication',
-    eta: '2024-02-10',
-    status: 'Not Started',
+    description: 'Build secure user authentication system with JWT tokens',
+    taskType: 'Feature',
+    priority: 'Critical',
+    status: 'To Do',
     assignedTo: 'Mike Johnson',
+    reporter: 'Project Manager',
+    eta: '2024-02-10',
+    estimatedHours: 20,
+    actualHours: 0,
     remark: 'Pending database completion',
     roadBlock: 'Dependencies not ready',
-    supportNeeded: 'Security review'
+    supportNeeded: 'Security review',
+    labels: ['authentication', 'security'],
+    attachments: [],
+    relatedTasks: ['2'],
+    sprint: 'Sprint 2'
   },
   {
     id: '4',
     projectId: '2',
     task: 'Create wireframes for new design',
-    eta: '2024-02-08',
+    description: 'Design low-fidelity wireframes for mobile app redesign',
+    taskType: 'Feature',
+    priority: 'Medium',
     status: 'Completed',
     assignedTo: 'Sarah Wilson',
+    reporter: 'Design Lead',
+    eta: '2024-02-08',
+    estimatedHours: 12,
+    actualHours: 10,
     remark: 'Wireframes approved by client',
     roadBlock: 'None',
-    supportNeeded: 'None'
+    supportNeeded: 'None',
+    labels: ['design', 'wireframes'],
+    attachments: [],
+    relatedTasks: [],
+    sprint: 'Sprint 1'
   },
   {
     id: '5',
     projectId: '2',
     task: 'Design high-fidelity mockups',
-    eta: '2024-02-15',
+    description: 'Create detailed mockups with proper color scheme and typography',
+    taskType: 'Feature',
+    priority: 'Medium',
     status: 'In Progress',
     assignedTo: 'Sarah Wilson',
+    reporter: 'Design Lead',
+    eta: '2024-02-15',
+    estimatedHours: 16,
+    actualHours: 8,
     remark: 'Working on color scheme',
     roadBlock: 'Brand guidelines pending',
-    supportNeeded: 'Brand manager input'
+    supportNeeded: 'Brand manager input',
+    labels: ['design', 'mockups'],
+    attachments: [],
+    relatedTasks: ['4'],
+    sprint: 'Sprint 2'
   },
   {
     id: '6',
     projectId: '3',
     task: 'Research data visualization libraries',
-    eta: '2024-02-03',
+    description: 'Evaluate and select appropriate data visualization libraries for dashboard',
+    taskType: 'Research',
+    priority: 'Low',
     status: 'Completed',
     assignedTo: 'Alex Chen',
+    reporter: 'Product Manager',
+    eta: '2024-02-03',
+    estimatedHours: 8,
+    actualHours: 6,
     remark: 'Recommended Chart.js and D3.js',
     roadBlock: 'None',
-    supportNeeded: 'None'
+    supportNeeded: 'None',
+    labels: ['research', 'visualization'],
+    attachments: [],
+    relatedTasks: [],
+    sprint: 'Sprint 1'
   }
 ];
 

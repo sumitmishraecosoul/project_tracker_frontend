@@ -1,5 +1,7 @@
 {
+  "/task-tracker/page": "app/task-tracker/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
   "/login/page": "app/login/page.js",
-  "/signup/page": "app/signup/page.js"
+  "/project-tracker/page": "app/project-tracker/page.js"
 }

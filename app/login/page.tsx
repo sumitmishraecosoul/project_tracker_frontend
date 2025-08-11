@@ -36,9 +36,18 @@ export default function LoginPage() {
     try {
       const data = await apiService.login(formData);
       
-      // Store user session and token
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      // Handle various token/user shapes
+      const token = data?.token || data?.accessToken || data?.jwt || data?.data?.token;
+      const user = data?.user || data?.data?.user || data?.profile || data;
+
+      if (!token) {
+        throw new Error('Authentication succeeded but no token was returned.');
+      }
+
+      localStorage.setItem('token', token);
+      if (user) {
+        localStorage.setItem('currentUser', JSON.stringify(user));
+      }
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');

@@ -38,6 +38,7 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
   });
 
   const [users, setUsers] = useState<User[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -76,6 +77,17 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
         ? prev.assignedTo.filter(id => id !== userId)
         : [...prev.assignedTo, userId]
     }));
+  };
+
+  const handleToggleAll = () => {
+    setSelectAll(prev => {
+      const next = !prev;
+      setFormData(cur => ({
+        ...cur,
+        assignedTo: next ? users.map(u => u.id) : []
+      }));
+      return next;
+    });
   };
 
   return (
@@ -172,6 +184,17 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Assign Team Members</label>
+              <div className="flex items-center mb-2">
+                <label className="flex items-center space-x-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectAll && users.length > 0 && formData.assignedTo.length === users.length}
+                    onChange={handleToggleAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Select All</span>
+                </label>
+              </div>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                 {users.map((user) => (
                   <label key={user.id} className="flex items-center space-x-3 py-2 cursor-pointer">

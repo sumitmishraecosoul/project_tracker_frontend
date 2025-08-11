@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Header from '../../components/Header';
-import AddTaskModal from '../../components/AddTaskModal';
+import AddUserTaskModal from '../../components/AddUserTaskModal';
 import EditUserTaskModal from '../../components/EditUserTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
@@ -49,14 +49,15 @@ export default function TaskTracker() {
     if (activeUserId) {
       fetchUserTasks();
     }
-  }, [activeUserId, activeFilter]);
+  }, [activeUserId]);
 
   const fetchUsers = async () => {
     try {
       const data = await apiService.getUsers();
-      setUsers(data);
-      if (data.length > 0 && !activeUserId) {
-        setActiveUserId(data[0].id);
+      const usersData = Array.isArray(data) ? data : [];
+      setUsers(usersData as User[]);
+      if (usersData.length > 0 && !activeUserId) {
+        setActiveUserId(usersData[0].id);
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -66,14 +67,13 @@ export default function TaskTracker() {
 
   const fetchUserTasks = async () => {
     if (!activeUserId) return;
-    
     setLoading(true);
     try {
       const data = await apiService.getUserTasks({ 
         userId: activeUserId,
-        typeOfWork: activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)
       });
-      setUserTasks(data);
+      const tasksData = Array.isArray(data) ? data : [];
+      setUserTasks(tasksData as UserTask[]);
     } catch (error) {
       console.error('Failed to fetch user tasks:', error);
       setError('Failed to load tasks');
@@ -82,9 +82,9 @@ export default function TaskTracker() {
   };
 
   const activeUser = users.find(user => user.id === activeUserId);
-  const filteredTasks = userTasks.filter(task => 
+  const filteredTasks = Array.isArray(userTasks) ? userTasks.filter(task => 
     task.frequency.toLowerCase() === activeFilter
-  );
+  ) : [];
 
   const handleAddTask = async (newTask: Omit<UserTask, 'id'>) => {
     try {
@@ -145,9 +145,9 @@ export default function TaskTracker() {
               <div className="p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Members</h2>
                 <div className="flex flex-wrap gap-2">
-                  {users.map((user) => (
+                  {Array.isArray(users) && users.map((user, index) => (
                     <button
-                      key={user.id}
+                      key={user.id || `user-${index}`}
                       onClick={() => setActiveUserId(user.id)}
                       className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer whitespace-nowrap transition-colors ${
                         activeUserId === user.id
@@ -218,9 +218,9 @@ export default function TaskTracker() {
                             Loading tasks...
                           </td>
                         </tr>
-                      ) : filteredTasks.length > 0 ? (
-                        filteredTasks.map((task) => (
-                          <tr key={task.id} className="hover:bg-gray-50">
+                      ) : Array.isArray(filteredTasks) && filteredTasks.length > 0 ? (
+                        filteredTasks.map((task, index) => (
+                          <tr key={task.id || `task-${index}`} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {new Date(task.date).toLocaleDateString()}
                             </td>
@@ -269,7 +269,7 @@ export default function TaskTracker() {
                       ) : (
                         <tr>
                           <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                            No {activeFilter} tasks found for this user.
+                            {Array.isArray(filteredTasks) ? `No ${activeFilter} tasks found for this user.` : 'No tasks available.'}
                           </td>
                         </tr>
                       )}
@@ -282,7 +282,7 @@ export default function TaskTracker() {
         </div>
 
         {isAddModalOpen && (
-          <AddTaskModal
+          <AddUserTaskModal
             userId={activeUserId}
             onAdd={handleAddTask}
             onClose={() => setIsAddModalOpen(false)}

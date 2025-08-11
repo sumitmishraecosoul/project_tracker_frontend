@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 import AddProjectModal from '../../components/AddProjectModal';
@@ -20,6 +20,8 @@ interface Project {
   assignedTo?: string[];
 }
 
+type StatusFilter = 'All' | 'Active' | 'Completed' | 'On Hold';
+
 export default function ProjectTracker() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -27,22 +29,54 @@ export default function ProjectTracker() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [statusFilter]);
 
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getProjects();
-      setProjects(data);
+      const data = await apiService.getProjects({
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+      });
+      console.log('Fetched projects data:', data);
+      
+      // Ensure data is an array - handle different response formats
+      let projectsData = [];
+      if (Array.isArray(data)) {
+        projectsData = data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.projects)) {
+        projectsData = data.projects;
+      } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
+        projectsData = data.data;
+      }
+      console.log('Processed projects data:', projectsData);
+      
+      setProjects(projectsData);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
       setError('Failed to load projects');
+      setProjects([]); // Set empty array on error
     }
     setLoading(false);
   };
+
+  const visibleProjects = useMemo(() => {
+    // Ensure projects is an array
+    const projectsArray = Array.isArray(projects) ? projects : [];
+    console.log('visibleProjects - projects array:', projectsArray);
+    
+    if (!searchQuery) return projectsArray;
+    const q = searchQuery.toLowerCase();
+    const filtered = projectsArray.filter((p) =>
+      [p.title, p.description].some((field) => field?.toLowerCase().includes(q))
+    );
+    console.log('visibleProjects - filtered:', filtered);
+    return filtered;
+  }, [projects, searchQuery]);
 
   const handleAddProject = async (newProjectData: Omit<Project, 'id'>) => {
     try {
@@ -128,6 +162,34 @@ export default function ProjectTracker() {
                 {error}
               </div>
             )}
+
+            {/* Filters */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    {(['All','Active','Completed','On Hold'] as StatusFilter[]).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by title or description..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+            </div>
             
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               <div className="p-6 border-b border-gray-200">
@@ -138,7 +200,7 @@ export default function ProjectTracker() {
                   <p>Loading projects...</p>
                 ) : (
                   <div className="space-y-4">
-                    {projects.map((project) => (
+                    {Array.isArray(visibleProjects) && visibleProjects.map((project) => (
                       <div key={project.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
                           <Link href={`/project-tracker/${project.id}`} className="flex-1 cursor-pointer">
@@ -199,9 +261,9 @@ export default function ProjectTracker() {
                         </div>
                       </div>
                     ))}
-                    {projects.length === 0 && !loading && (
+                    {(!Array.isArray(visibleProjects) || visibleProjects.length === 0) && !loading && (
                       <div className="text-center py-8 text-gray-500">
-                        No projects found. Create your first project to get started.
+                        {!Array.isArray(visibleProjects) ? 'Error loading projects' : 'No projects found with current filters.'}
                       </div>
                     )}
                   </div>
