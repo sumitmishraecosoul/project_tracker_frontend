@@ -1,87 +1,107 @@
 
 'use client';
 
-import ProtectedRoute from '../components/ProtectedRoute';
-import Header from '../components/Header';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Header from '../components/Header';
+import ProtectedRoute from '../components/ProtectedRoute';
 
-export default function Home() {
+export default function ApplicationLauncher() {
   const router = useRouter();
 
-  const openExternal = (url?: string) => {
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } else {
-      alert('This app link is not configured. Please set the corresponding NEXT_PUBLIC_* URL in your environment.');
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
     }
+  }, [router]);
+
+  const handleProjectTracker = () => {
+    router.push('/project-tracker');
   };
 
-  const HR_PORTAL_URL = process.env.NEXT_PUBLIC_HR_PORTAL_URL;
-  const QUERY_TRACKER_URL = process.env.NEXT_PUBLIC_QUERY_TRACKER_URL;
-  const ASSET_MGMT_URL = process.env.NEXT_PUBLIC_ASSET_MGMT_URL;
+  const handleExternalLink = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  const applications = [
+    {
+      id: 'hr-portal',
+      title: 'HR Portal',
+      description: 'Human Resources Management System',
+      icon: '👥',
+      color: 'bg-blue-500',
+      hoverColor: 'hover:bg-blue-600',
+      action: () => handleExternalLink('https://hr-portal.example.com')
+    },
+    {
+      id: 'query-tracker',
+      title: 'Query Tracker',
+      description: 'Customer Support & Query Management',
+      icon: '❓',
+      color: 'bg-green-500',
+      hoverColor: 'hover:bg-green-600',
+      action: () => handleExternalLink('https://query-tracker.example.com')
+    },
+    {
+      id: 'project-tracker',
+      title: 'Project Tracker',
+      description: 'Project Management & Task Tracking',
+      icon: '📊',
+      color: 'bg-purple-500',
+      hoverColor: 'hover:bg-purple-600',
+      action: handleProjectTracker
+    },
+    {
+      id: 'asset-management',
+      title: 'Asset Management',
+      description: 'IT Asset & Inventory Management',
+      icon: '💻',
+      color: 'bg-orange-500',
+      hoverColor: 'hover:bg-orange-600',
+      action: () => handleExternalLink('https://asset-management.example.com')
+    }
+  ];
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="px-6 py-10">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-10">
-              <h1 className="text-3xl font-bold text-gray-900">Welcome</h1>
-              <p className="text-gray-600">Choose a product to continue</p>
+        <div className="px-6 py-8">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                Welcome to Your Workspace
+              </h1>
+              <p className="text-xl text-gray-600">
+                Choose an application to get started
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* HR Portal */}
-              <button
-                onClick={() => openExternal(HR_PORTAL_URL)}
-                className="bg-white border border-gray-200 rounded-xl p-6 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                title="Opens in new tab"
-              >
-                <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
-                  <i className="ri-user-3-line text-pink-600 text-2xl"></i>
+            {/* Application Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {applications.map((app) => (
+                <div
+                  key={app.id}
+                  onClick={app.action}
+                  className={`${app.color} ${app.hoverColor} transform transition-all duration-200 hover:scale-105 cursor-pointer rounded-xl shadow-lg p-6 text-white`}
+                >
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">{app.icon}</div>
+                    <h3 className="text-xl font-semibold mb-2">{app.title}</h3>
+                    <p className="text-sm opacity-90">{app.description}</p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">HR Portal</h3>
-                <p className="text-sm text-gray-600">People ops, leaves, policies and more.</p>
-              </button>
+              ))}
+            </div>
 
-              {/* Query Tracker */}
-              <button
-                onClick={() => openExternal(QUERY_TRACKER_URL)}
-                className="bg-white border border-gray-200 rounded-xl p-6 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                title="Opens in new tab"
-              >
-                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mb-4">
-                  <i className="ri-question-answer-line text-amber-600 text-2xl"></i>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Query Tracker</h3>
-                <p className="text-sm text-gray-600">Track and resolve internal/external queries.</p>
-              </button>
-
-              {/* Project Tracker (inside app) */}
-              <button
-                onClick={() => router.push('/project-tracker')}
-                className="bg-white border border-gray-200 rounded-xl p-6 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-              >
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                  <i className="ri-folder-chart-line text-blue-600 text-2xl"></i>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Project Tracker</h3>
-                <p className="text-sm text-gray-600">Manage projects, tasks and progress.</p>
-              </button>
-
-              {/* Asset Management */}
-              <button
-                onClick={() => openExternal(ASSET_MGMT_URL)}
-                className="bg-white border border-gray-200 rounded-xl p-6 text-left shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                title="Opens in new tab"
-              >
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <i className="ri-archive-2-line text-green-600 text-2xl"></i>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Asset Management</h3>
-                <p className="text-sm text-gray-600">Track company assets and allocations.</p>
-              </button>
+            {/* Footer Info */}
+            <div className="mt-12 text-center">
+              <p className="text-gray-500 text-sm">
+                Click on any application to launch it. External applications will open in a new tab.
+              </p>
             </div>
           </div>
         </div>

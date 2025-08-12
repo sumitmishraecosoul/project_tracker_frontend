@@ -24,7 +24,7 @@ export default function Header() {
   };
   
   const menuItems = [
-    { name: 'Dashboard', path: '/' },
+    { name: 'Dashboard', path: '/project-tracker/dashboard' },
     { name: 'Project Tracker', path: '/project-tracker' },
     { name: 'Task Tracker', path: '/task-tracker' }
   ];
