@@ -3,30 +3,50 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '../../../components/Header';
-import EditTaskModal from '../../../components/EditTaskModal';
 import { apiService } from '../../../lib/api-service';
 
 interface Project {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
   priority: 'Low' | 'Medium' | 'High';
+  createdBy?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  assignedTo?: Array<{
+    _id: string;
+    name: string;
+    email: string;
+  }>;
   startDate: string;
   dueDate: string;
-  assignedTo?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface Task {
+  _id: string;
   id: string;
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
-  assignedTo: string;
-  reporter: string;
+  taskType?: string;
+  priority: string;
+  status: string;
+  assignedTo: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  reporter: {
+    _id: string;
+    name: string;
+    email: string;
+  };
   startDate?: string;
   eta: string;
   estimatedHours?: number;
@@ -34,11 +54,13 @@ interface Task {
   remark?: string;
   roadBlock?: string;
   supportNeeded?: string;
-  labels: string[];
-  attachments: string[];
-  relatedTasks: string[];
+  labels?: string[];
+  attachments?: string[];
+  relatedTasks?: string[];
   parentTask?: string;
   sprint?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ProjectDetailProps {
@@ -48,8 +70,6 @@ interface ProjectDetailProps {
 export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -59,40 +79,74 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
 
   const fetchProjectData = async () => {
     setLoading(true);
+    setError('');
     try {
-      const [projectData, tasksData] = await Promise.all([
-        apiService.getProjectById(projectId),
-        apiService.getProjectTasks(projectId)
-      ]);
-      setProject(projectData);
-      setTasks(tasksData);
+      console.log('Fetching project data for ID:', projectId);
+      
+      // Get project details - this endpoint returns both project and tasks
+      const response = await apiService.getProjectById(projectId);
+      console.log('Project API response:', response);
+      
+      // Check if response has the expected structure
+      if (response && response.project) {
+        setProject(response.project);
+        setTasks(response.tasks || []);
+        console.log('Project data set:', response.project);
+        console.log('Project _id:', response.project._id);
+        console.log('Tasks data set:', response.tasks);
+        console.log('Number of tasks:', response.tasks ? response.tasks.length : 0);
+        
+        // If no tasks in the response, try to fetch them separately
+        if (!response.tasks || response.tasks.length === 0) {
+          console.log('No tasks in response, trying to fetch separately...');
+          try {
+            const tasksResponse = await apiService.getProjectTasks(projectId);
+            console.log('Separate tasks response:', tasksResponse);
+            if (Array.isArray(tasksResponse) && tasksResponse.length > 0) {
+              setTasks(tasksResponse);
+              console.log('Tasks set from separate call:', tasksResponse);
+            } else {
+              // Last resort: fetch all tasks and filter
+              console.log('Trying to fetch all tasks and filter...');
+              const allTasks = await apiService.getTasks();
+              console.log('All tasks in database:', allTasks);
+              const projectTasks = allTasks.filter((task: any) => {
+                console.log(`Checking task ${task.task}: projectId=${task.projectId}, projectId=${projectId}`);
+                return task.projectId === projectId || task.projectId === response.project._id;
+              });
+              console.log('Filtered tasks for this project:', projectTasks);
+              if (projectTasks.length > 0) {
+                setTasks(projectTasks);
+                console.log('Tasks set from filtered results:', projectTasks);
+              }
+            }
+          } catch (separateError) {
+            console.log('Separate tasks fetch failed:', separateError);
+          }
+        }
+      } else if (response && response._id) {
+        // Fallback: if response is the project directly
+        setProject(response);
+        console.log('Project set directly:', response);
+        // Try to get tasks separately
+        try {
+          const tasksResponse = await apiService.getProjectTasks(projectId);
+          setTasks(Array.isArray(tasksResponse) ? tasksResponse : []);
+          console.log('Tasks fetched separately:', tasksResponse);
+          console.log('Number of tasks from separate call:', Array.isArray(tasksResponse) ? tasksResponse.length : 0);
+        } catch (tasksError) {
+          console.log('Could not fetch tasks separately:', tasksError);
+          setTasks([]);
+        }
+      } else {
+        console.error('Unexpected response format:', response);
+        setError('Invalid project data format');
+      }
     } catch (error) {
       console.error('Failed to fetch project data:', error);
       setError('Failed to load project data');
     }
     setLoading(false);
-  };
-
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveTask = async (updatedTask: Task) => {
-    try {
-      await apiService.updateTask(updatedTask.id, updatedTask);
-      await fetchProjectData();
-      setIsModalOpen(false);
-      setEditingTask(null);
-    } catch (error) {
-      console.error('Failed to update task:', error);
-      setError('Failed to update task');
-    }
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingTask(null);
   };
 
   if (loading) {
@@ -120,6 +174,10 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
       </div>
     );
   }
+
+  console.log('Rendering project detail with project:', project);
+  console.log('Rendering project detail with tasks:', tasks);
+  console.log('Tasks length:', tasks.length);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -245,17 +303,15 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                           {task.priority}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo?.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {task.actualHours || 0}/{task.estimatedHours || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleEditTask(task)}
-                          className="text-blue-600 hover:text-blue-900 cursor-pointer whitespace-nowrap"
-                        >
+                        {/* Temporarily disabled edit functionality */}
+                        <span className="text-gray-400 cursor-not-allowed">
                           <i className="ri-edit-line w-4 h-4"></i>
-                        </button>
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -272,14 +328,6 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
           </div>
         </div>
       </div>
-
-      {isModalOpen && editingTask && (
-        <EditTaskModal
-          task={editingTask}
-          onSave={handleSaveTask}
-          onClose={handleCloseModal}
-        />
-      )}
     </div>
   );
 }

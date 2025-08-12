@@ -10,7 +10,8 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 
 interface Project {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
@@ -39,23 +40,23 @@ export default function ProjectTracker() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getProjects({
+      const response = await apiService.getProjects({
         status: statusFilter !== 'All' ? statusFilter : undefined,
       });
-      console.log('Fetched projects data:', data);
+      console.log('Projects API response:', response);
       
-      // Ensure data is an array - handle different response formats
-      let projectsData = [];
-      if (Array.isArray(data)) {
-        projectsData = data;
-      } else if (data && typeof data === 'object' && Array.isArray(data.projects)) {
-        projectsData = data.projects;
-      } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
-        projectsData = data.data;
+      // Handle the new paginated response format
+      if (response && response.projects) {
+        setProjects(response.projects);
+        console.log('Projects set from paginated response:', response.projects);
+      } else if (Array.isArray(response)) {
+        // Fallback: if response is directly an array
+        setProjects(response);
+        console.log('Projects set from array response:', response);
+      } else {
+        console.error('Unexpected projects response format:', response);
+        setProjects([]);
       }
-      console.log('Processed projects data:', projectsData);
-      
-      setProjects(projectsData);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
       setError('Failed to load projects');
@@ -107,6 +108,8 @@ export default function ProjectTracker() {
   };
 
   const handleDeleteProject = async (projectId: string) => {
+    if (!projectId) return;
+    
     if (confirm('Are you sure you want to delete this project?')) {
       try {
         await apiService.deleteProject(projectId);
@@ -201,9 +204,9 @@ export default function ProjectTracker() {
                 ) : (
                   <div className="space-y-4">
                     {Array.isArray(visibleProjects) && visibleProjects.map((project) => (
-                      <div key={project.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                      <div key={project._id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                         <div className="flex items-center justify-between">
-                          <Link href={`/project-tracker/${project.id}`} className="flex-1 cursor-pointer">
+                          <Link href={`/project-tracker/${project._id}`} className="flex-1 cursor-pointer">
                             <div>
                               <div className="flex items-center space-x-3 mb-2">
                                 <h3 className="text-xl font-semibold text-gray-900">{project.title}</h3>
@@ -247,14 +250,16 @@ export default function ProjectTracker() {
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
-                                handleDeleteProject(project.id);
+                                if (project._id) {
+                                  handleDeleteProject(project._id);
+                                }
                               }}
                               className="text-red-600 hover:text-red-800 cursor-pointer"
                               title="Delete Project"
                             >
                               <i className="ri-delete-bin-line w-5 h-5"></i>
                             </button>
-                            <Link href={`/project-tracker/${project.id}`}>
+                            <Link href={`/project-tracker/${project._id}`}>
                               <i className="ri-arrow-right-line w-5 h-5 text-gray-400"></i>
                             </Link>
                           </div>

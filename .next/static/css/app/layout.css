@@ -585,6 +585,9 @@ video {
 .max-w-2xl{
   max-width: 42rem;
 }
+.max-w-4xl{
+  max-width: 56rem;
+}
 .max-w-7xl{
   max-width: 80rem;
 }
@@ -593,9 +596,6 @@ video {
 }
 .max-w-xs{
   max-width: 20rem;
-}
-.max-w-4xl{
-  max-width: 56rem;
 }
 .flex-1{
   flex: 1 1 0%;
@@ -607,6 +607,9 @@ video {
 }
 .animate-spin{
   animation: spin 1s linear infinite;
+}
+.cursor-not-allowed{
+  cursor: not-allowed;
 }
 .cursor-pointer{
   cursor: pointer;
