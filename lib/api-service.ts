@@ -308,12 +308,31 @@ class ApiService {
   }
 
   async updateTask(id: string, taskData: any) {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
-      method: 'PUT',
-      headers: this.getAuthHeader(),
-      body: JSON.stringify(taskData)
-    });
-    return this.handleResponse(response);
+    console.log('API Service - updateTask called with ID:', id);
+    console.log('API Service - updateTask data:', taskData);
+    console.log('API Service - updateTask URL:', `${API_BASE_URL}/api/tasks/${id}`);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify(taskData)
+      });
+      
+      console.log('API Service - updateTask response status:', response.status);
+      console.log('API Service - updateTask response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Service - updateTask error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('API Service - updateTask error:', error);
+      throw error;
+    }
   }
 
   async deleteTask(id: string) {

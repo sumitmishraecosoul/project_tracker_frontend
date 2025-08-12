@@ -143,7 +143,7 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
           reporter: newTaskData.reporter,
           eta: newTaskData.eta
         });
-        alert('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and ETA');
+        alert('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and End Date');
         setLoading(false);
         return;
       }
@@ -381,7 +381,7 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ETA *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">End Date *</label>
                 <input
                   type="date"
                   value={newTaskData.eta}

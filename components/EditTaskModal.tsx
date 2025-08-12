@@ -4,15 +4,24 @@ import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
 interface Task {
+  _id: string;
   id: string;
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
-  assignedTo: string;
-  reporter: string;
+  taskType?: string;
+  priority: string;
+  status: string;
+  assignedTo: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  reporter: {
+    _id: string;
+    name: string;
+    email: string;
+  };
   startDate?: string;
   eta: string;
   estimatedHours?: number;
@@ -20,15 +29,18 @@ interface Task {
   remark?: string;
   roadBlock?: string;
   supportNeeded?: string;
-  labels: string[];
-  attachments: string[];
-  relatedTasks: string[];
+  labels?: string[];
+  attachments?: string[];
+  relatedTasks?: string[];
   parentTask?: string;
   sprint?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface User {
-  id: string;
+  _id: string;
+  id?: string;
   name: string;
   email: string;
 }
@@ -40,7 +52,12 @@ interface EditTaskModalProps {
 }
 
 export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalProps) {
-  const [formData, setFormData] = useState<Task>(task);
+  const [formData, setFormData] = useState<Task>({
+    ...task,
+    // Format dates for input fields
+    startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
+    eta: task.eta ? new Date(task.eta).toISOString().split('T')[0] : ''
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -64,8 +81,22 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
     setLoading(false);
   };
 
-  const handleInputChange = (field: keyof Task, value: string | number) => {
+  const handleInputChange = (field: keyof Task, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleUserChange = (field: 'assignedTo' | 'reporter', userId: string) => {
+    const selectedUser = users.find(user => user._id === userId);
+    if (selectedUser) {
+      setFormData(prev => ({
+        ...prev,
+        [field]: {
+          _id: selectedUser._id,
+          name: selectedUser.name,
+          email: selectedUser.email
+        }
+      }));
+    }
   };
 
   return (
@@ -156,33 +187,38 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reporter</label>
-                <input
-                  type="text"
-                  value={formData.reporter}
-                  onChange={(e) => handleInputChange('reporter', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter reporter name"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To</label>
+                <select
+                  value={formData.assignedTo._id}
+                  onChange={(e) => handleUserChange('assignedTo', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
-                />
+                >
+                  <option value="">Select a user</option>
+                  {users.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To</label>
-              <select
-                value={formData.assignedTo}
-                onChange={(e) => handleInputChange('assignedTo', e.target.value)}
-                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              >
-                <option value="">Select a user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} ({user.email})
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Reporter</label>
+                <select
+                  value={formData.reporter._id}
+                  onChange={(e) => handleUserChange('reporter', e.target.value)}
+                  className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                >
+                  <option value="">Select a user</option>
+                  {users.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -197,7 +233,7 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
                 <input
                   type="date"
                   value={formData.eta}
