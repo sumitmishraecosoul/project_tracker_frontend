@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Header from '../../components/Header';
 import AddProjectModal from '../../components/AddProjectModal';
 import EditProjectModal from '../../components/EditProjectModal';
+import TeamMemberManagement from '../../components/TeamMemberManagement';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 
@@ -18,7 +19,23 @@ interface Project {
   priority: 'Low' | 'Medium' | 'High';
   startDate: string;
   dueDate: string;
-  assignedTo?: string[];
+  assignedTo?: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    department: string;
+  }>;
+  teamMembers?: Array<{
+    user: {
+      _id: string;
+      name: string;
+      email: string;
+      role: string;
+      department: string;
+    };
+    role: string;
+  }>;
 }
 
 type StatusFilter = 'All' | 'Active' | 'Completed' | 'On Hold';
@@ -27,7 +44,9 @@ export default function ProjectTracker() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [selectedProjectForTeam, setSelectedProjectForTeam] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
@@ -79,7 +98,15 @@ export default function ProjectTracker() {
     return filtered;
   }, [projects, searchQuery]);
 
-  const handleAddProject = async (newProjectData: Omit<Project, 'id'>) => {
+  const handleAddProject = async (newProjectData: {
+    title: string;
+    description: string;
+    status: 'Active' | 'Completed' | 'On Hold';
+    priority: 'Low' | 'Medium' | 'High';
+    startDate: string;
+    dueDate: string;
+    assignedTo: string[];
+  }) => {
     try {
       await apiService.createProject(newProjectData);
       await fetchProjects();
@@ -95,9 +122,18 @@ export default function ProjectTracker() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProject = async (updatedProject: Project) => {
+  const handleSaveProject = async (updatedProject: {
+    _id: string;
+    title: string;
+    description: string;
+    status: 'Active' | 'Completed' | 'On Hold';
+    priority: 'Low' | 'Medium' | 'High';
+    startDate: string;
+    dueDate: string;
+    assignedTo: string[];
+  }) => {
     try {
-      await apiService.updateProject(updatedProject.id, updatedProject);
+      await apiService.updateProject(updatedProject._id, updatedProject);
       await fetchProjects();
       setIsEditModalOpen(false);
       setEditingProject(null);
@@ -124,7 +160,34 @@ export default function ProjectTracker() {
   const handleCloseModals = () => {
     setIsAddModalOpen(false);
     setIsEditModalOpen(false);
+    setIsTeamModalOpen(false);
     setEditingProject(null);
+    setSelectedProjectForTeam(null);
+  };
+
+  const handleTeamManagement = (project: Project) => {
+    setSelectedProjectForTeam(project);
+    setIsTeamModalOpen(true);
+  };
+
+  const handleTeamUpdate = async () => {
+    try {
+      // Refresh the projects list
+      await fetchProjects();
+      
+      // If we have a selected project for team management, refresh its data
+      if (selectedProjectForTeam) {
+        console.log('Refreshing selected project data for team management:', selectedProjectForTeam._id);
+        const updatedProject = await apiService.getProjectById(selectedProjectForTeam._id);
+        console.log('Updated project data:', updatedProject);
+        
+        if (updatedProject) {
+          setSelectedProjectForTeam(updatedProject);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update team data:', error);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -250,6 +313,16 @@ export default function ProjectTracker() {
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
+                                handleTeamManagement(project);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                              title="Manage Team"
+                            >
+                              <i className="ri-team-line w-5 h-5"></i>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
                                 if (project._id) {
                                   handleDeleteProject(project._id);
                                 }
@@ -290,6 +363,18 @@ export default function ProjectTracker() {
             project={editingProject}
             onSave={handleSaveProject}
             onClose={handleCloseModals}
+          />
+        )}
+
+        {isTeamModalOpen && selectedProjectForTeam && (
+          <TeamMemberManagement
+            projectId={selectedProjectForTeam._id}
+            currentTeamMembers={selectedProjectForTeam.teamMembers || []}
+            onTeamUpdate={handleTeamUpdate}
+            onClose={() => {
+              setIsTeamModalOpen(false);
+              setSelectedProjectForTeam(null);
+            }}
           />
         )}
       </div>

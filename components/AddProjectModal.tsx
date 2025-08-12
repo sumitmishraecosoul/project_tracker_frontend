@@ -5,36 +5,52 @@ import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
 interface Project {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
   priority: 'Low' | 'Medium' | 'High';
   startDate: string;
   dueDate: string;
-  assignedTo?: string[];
+  assignedTo?: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    department: string;
+  }>;
+}
+
+interface ProjectFormData {
+  title: string;
+  description: string;
+  status: 'Active' | 'Completed' | 'On Hold';
+  priority: 'Low' | 'Medium' | 'High';
+  startDate: string;
+  dueDate: string;
+  assignedTo: string[];
 }
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
 }
 
 interface AddProjectModalProps {
-  onSave: (project: Omit<Project, 'id'>) => void;
+  onSave: (project: ProjectFormData) => void;
   onClose: () => void;
 }
 
 export default function AddProjectModal({ onSave, onClose }: AddProjectModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProjectFormData>({
     title: '',
     description: '',
-    status: 'Active' as 'Active' | 'Completed' | 'On Hold',
-    priority: 'Medium' as 'Low' | 'Medium' | 'High',
+    status: 'Active',
+    priority: 'Medium',
     startDate: new Date().toISOString().split('T')[0],
     dueDate: '',
-    assignedTo: [] as string[]
+    assignedTo: []
   });
 
   const [users, setUsers] = useState<User[]>([]);
@@ -60,7 +76,8 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
     const newProject = {
       ...formData,
       startDate: formData.startDate,
-      dueDate: formData.dueDate
+      dueDate: formData.dueDate,
+      assignedTo: formData.assignedTo // Keep as string array for API
     };
     onSave(newProject);
     setLoading(false);
@@ -84,7 +101,7 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
       const next = !prev;
       setFormData(cur => ({
         ...cur,
-        assignedTo: next ? users.map(u => u.id) : []
+        assignedTo: next ? users.map(u => u._id) : []
       }));
       return next;
     });
@@ -197,11 +214,11 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
               </div>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                 {users.map((user) => (
-                  <label key={user.id} className="flex items-center space-x-3 py-2 cursor-pointer">
+                  <label key={user._id} className="flex items-center space-x-3 py-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.assignedTo.includes(user.id)}
-                      onChange={() => handleUserToggle(user.id)}
+                      checked={formData.assignedTo.includes(user._id)}
+                      onChange={() => handleUserToggle(user._id)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <div>

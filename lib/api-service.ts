@@ -1,5 +1,22 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+// Check if we're in development mode
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Helper function for development-only logging
+const devLog = (...args: any[]) => {
+  if (isDevelopment) {
+    console.log(...args);
+  }
+};
+
+// Helper function for development-only error logging
+const devError = (...args: any[]) => {
+  if (isDevelopment) {
+    console.error(...args);
+  }
+};
+
 interface User {
   _id: string;
   id?: string;
@@ -57,20 +74,20 @@ class ApiService {
   }
 
   private async handleResponse(response: Response) {
-    console.log('API Response Status:', response.status);
-    console.log('API Response OK:', response.ok);
-    console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
+    devLog('API Response Status:', response.status);
+    devLog('API Response OK:', response.ok);
+    devLog('API Response Headers:', Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       let errorMessage = 'API request failed';
       try {
         const errorData = await response.json();
-        console.log('API Error Data:', errorData);
+        devLog('API Error Data:', errorData);
         errorMessage = errorData.message || errorData.error || errorData.msg || 'API request failed';
       } catch (parseError) {
-        console.log('Failed to parse error response:', parseError);
+        devLog('Failed to parse error response:', parseError);
         const errorText = await response.text();
-        console.log('Raw error response:', errorText);
+        devLog('Raw error response:', errorText);
         errorMessage = errorText || 'API request failed';
       }
       
@@ -89,10 +106,10 @@ class ApiService {
     
     try {
       const data = await response.json();
-      console.log('API Success Response:', data);
+      devLog('API Success Response:', data);
       return data;
     } catch (parseError) {
-      console.log('Failed to parse success response:', parseError);
+      devLog('Failed to parse success response:', parseError);
       throw new Error('Failed to parse API response');
     }
   }
@@ -145,10 +162,10 @@ class ApiService {
         headers: this.getAuthHeader()
       });
       const data = await this.handleResponse(response);
-      console.log('API Service - getUsers response:', data);
+      devLog('API Service - getUsers response:', data);
       return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error('API Service - getUsers error:', error);
+      devError('API Service - getUsers error:', error);
       throw error;
     }
   }
@@ -228,6 +245,245 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // Team Member Management APIs
+  async addTeamMember(projectId: string, userId: string, role: string = 'member') {
+    devLog('API Service - addTeamMember called with:', { projectId, userId, role });
+    devLog('API Service - URL:', `${API_BASE_URL}/api/projects/${projectId}/team-members`);
+    devLog('API Service - Headers:', this.getAuthHeader());
+    devLog('API Service - Request Body:', JSON.stringify({ userId, role }, null, 2));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/team-members`, {
+        method: 'POST',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify({ userId, role })
+      });
+      
+      devLog('API Service - addTeamMember response status:', response.status);
+      devLog('API Service - addTeamMember response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        devError('API Service - addTeamMember error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await this.handleResponse(response);
+      devLog('API Service - addTeamMember success result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - addTeamMember error:', error);
+      throw error;
+    }
+  }
+
+  async removeTeamMember(projectId: string, userId: string) {
+    devLog('API Service - removeTeamMember called with:', { projectId, userId });
+    devLog('API Service - URL:', `${API_BASE_URL}/api/projects/${projectId}/team-members/${userId}`);
+    devLog('API Service - Headers:', this.getAuthHeader());
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/team-members/${userId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeader()
+      });
+      
+      devLog('API Service - removeTeamMember response status:', response.status);
+      devLog('API Service - removeTeamMember response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        devError('API Service - removeTeamMember error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await this.handleResponse(response);
+      devLog('API Service - removeTeamMember success result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - removeTeamMember error:', error);
+      throw error;
+    }
+  }
+
+  async updateTeamMemberRole(projectId: string, userId: string, role: string) {
+    devLog('API Service - updateTeamMemberRole called with:', { projectId, userId, role });
+    devLog('API Service - URL:', `${API_BASE_URL}/api/projects/${projectId}/team-members/${userId}`);
+    devLog('API Service - Headers:', this.getAuthHeader());
+    devLog('API Service - Request Body:', JSON.stringify({ role }, null, 2));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/team-members/${userId}`, {
+        method: 'PUT',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify({ role })
+      });
+      
+      devLog('API Service - updateTeamMemberRole response status:', response.status);
+      devLog('API Service - updateTeamMemberRole response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        devError('API Service - updateTeamMemberRole error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await this.handleResponse(response);
+      devLog('API Service - updateTeamMemberRole success result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - updateTeamMemberRole error:', error);
+      throw error;
+    }
+  }
+
+  async bulkAddTeamMembers(projectId: string, teamMembers: Array<{ userId: string; role?: string }>) {
+    devLog('API Service - bulkAddTeamMembers called with:', { projectId, teamMembers });
+    devLog('API Service - URL:', `${API_BASE_URL}/api/projects/${projectId}/team-members/bulk`);
+    devLog('API Service - Headers:', this.getAuthHeader());
+    devLog('API Service - Request Body:', JSON.stringify({ teamMembers }, null, 2));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/team-members/bulk`, {
+        method: 'POST',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify({ teamMembers })
+      });
+      
+      devLog('API Service - bulkAddTeamMembers response status:', response.status);
+      devLog('API Service - bulkAddTeamMembers response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        devError('API Service - bulkAddTeamMembers error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await this.handleResponse(response);
+      devLog('API Service - bulkAddTeamMembers success result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - bulkAddTeamMembers error:', error);
+      throw error;
+    }
+  }
+
+  // Fallback method using project update API
+  async addTeamMembersViaProjectUpdate(projectId: string, userIds: string[]) {
+    devLog('API Service - addTeamMembersViaProjectUpdate called with:', { projectId, userIds });
+    
+    try {
+      // First get the current project data
+      const currentProject = await this.getProjectById(projectId);
+      devLog('API Service - Current project data:', currentProject);
+      
+      // Get current teamMembers array (not assignedTo)
+      const currentTeamMembers = currentProject.teamMembers || [];
+      devLog('API Service - Current teamMembers:', currentTeamMembers);
+      
+      // Extract existing user IDs from teamMembers (handle both direct user objects and nested user objects)
+      const existingUserIds = currentTeamMembers.map((item: any) => {
+        if (item && typeof item === 'object') {
+          if (item.user && item.user._id) {
+            return item.user._id; // Nested user object
+          } else if (item._id) {
+            return item._id; // Direct user object
+          }
+        }
+        return null;
+      }).filter((id: string | null) => id !== null);
+      
+      devLog('API Service - Existing team member user IDs:', existingUserIds);
+      
+      // Add new user IDs to the array (avoiding duplicates)
+      const updatedUserIds = [...new Set([...existingUserIds, ...userIds])];
+      devLog('API Service - Updated user IDs:', updatedUserIds);
+      
+      // Create teamMembers array with proper structure for backend
+      const updatedTeamMembers = updatedUserIds.map(userId => ({
+        user: userId,
+        role: 'member' // default role
+      }));
+      
+      // Update the project with new teamMembers array
+      const updateData = {
+        ...currentProject,
+        teamMembers: updatedTeamMembers
+      };
+      
+      devLog('API Service - Update data:', updateData);
+      
+      const result = await this.updateProject(projectId, updateData);
+      devLog('API Service - Project update result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - addTeamMembersViaProjectUpdate error:', error);
+      throw error;
+    }
+  }
+
+  async removeTeamMemberViaProjectUpdate(projectId: string, userId: string) {
+    devLog('API Service - removeTeamMemberViaProjectUpdate called with:', { projectId, userId });
+    
+    try {
+      // First get the current project data
+      const currentProject = await this.getProjectById(projectId);
+      devLog('API Service - Current project data:', currentProject);
+      
+      // Get current teamMembers array (not assignedTo)
+      const currentTeamMembers = currentProject.teamMembers || [];
+      devLog('API Service - Current teamMembers before removal:', currentTeamMembers);
+      devLog('API Service - Current teamMembers count before removal:', currentTeamMembers.length);
+      
+      // Log each team member for debugging
+      currentTeamMembers.forEach((member: any, index: number) => {
+        const memberUserId = typeof member.user === 'string' ? member.user : member.user._id;
+        devLog(`API Service - Team member ${index}:`, {
+          member,
+          memberUserId,
+          shouldRemove: memberUserId === userId
+        });
+      });
+      
+      // Remove ONLY the specific user ID from the teamMembers array
+      const updatedTeamMembers = currentTeamMembers.filter((item: any) => {
+        if (item && typeof item === 'object' && item.user) {
+          const itemUserId = typeof item.user === 'string' ? item.user : item.user._id;
+          const shouldKeep = itemUserId !== userId;
+          devLog(`API Service - Filtering team member: ${itemUserId} !== ${userId} = ${shouldKeep}`);
+          return shouldKeep;
+        }
+        devLog('API Service - Keeping item (no user property):', item);
+        return true;
+      });
+      
+      devLog('API Service - Updated teamMembers after removal:', updatedTeamMembers);
+      devLog('API Service - Updated teamMembers count after removal:', updatedTeamMembers.length);
+      devLog('API Service - Removed count:', currentTeamMembers.length - updatedTeamMembers.length);
+      
+      // Verify we only removed one member
+      if (currentTeamMembers.length - updatedTeamMembers.length !== 1) {
+        devError('API Service - WARNING: Removed more than one team member!');
+        throw new Error('Team member removal failed - removed more than one member');
+      }
+      
+      // Update the project with new teamMembers array
+      const updateData = {
+        ...currentProject,
+        teamMembers: updatedTeamMembers
+      };
+      
+      devLog('API Service - Update data:', updateData);
+      
+      const result = await this.updateProject(projectId, updateData);
+      devLog('API Service - Project update result:', result);
+      return result;
+    } catch (error) {
+      devError('API Service - removeTeamMemberViaProjectUpdate error:', error);
+      throw error;
+    }
+  }
+
   // Task APIs
   async getTasks(): Promise<Task[]> {
     try {
@@ -235,10 +491,10 @@ class ApiService {
         headers: this.getAuthHeader()
       });
       const data = await this.handleResponse(response);
-      console.log('API Service - getTasks response:', data);
+      devLog('API Service - getTasks response:', data);
       return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error('API Service - getTasks error:', error);
+      devError('API Service - getTasks error:', error);
       throw error;
     }
   }
@@ -279,10 +535,10 @@ class ApiService {
     parentTask?: string;
     sprint?: string;
   }) {
-    console.log('API Service - createTask called with:', taskData);
-    console.log('API Service - URL:', `${API_BASE_URL}/api/tasks`);
-    console.log('API Service - Headers:', this.getAuthHeader());
-    console.log('API Service - Request Body:', JSON.stringify(taskData, null, 2));
+    devLog('API Service - createTask called with:', taskData);
+    devLog('API Service - URL:', `${API_BASE_URL}/api/tasks`);
+    devLog('API Service - Headers:', this.getAuthHeader());
+    devLog('API Service - Request Body:', JSON.stringify(taskData, null, 2));
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/tasks`, {
@@ -291,26 +547,26 @@ class ApiService {
         body: JSON.stringify(taskData)
       });
       
-      console.log('API Service - Response status:', response.status);
-      console.log('API Service - Response ok:', response.ok);
+      devLog('API Service - Response status:', response.status);
+      devLog('API Service - Response ok:', response.ok);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Service - Error response body:', errorText);
+        devError('API Service - Error response body:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       
       return this.handleResponse(response);
     } catch (fetchError) {
-      console.error('API Service - Fetch error:', fetchError);
+      devError('API Service - Fetch error:', fetchError);
       throw fetchError;
     }
   }
 
   async updateTask(id: string, taskData: any) {
-    console.log('API Service - updateTask called with ID:', id);
-    console.log('API Service - updateTask data:', taskData);
-    console.log('API Service - updateTask URL:', `${API_BASE_URL}/api/tasks/${id}`);
+    devLog('API Service - updateTask called with ID:', id);
+    devLog('API Service - updateTask data:', taskData);
+    devLog('API Service - updateTask URL:', `${API_BASE_URL}/api/tasks/${id}`);
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
@@ -319,18 +575,18 @@ class ApiService {
         body: JSON.stringify(taskData)
       });
       
-      console.log('API Service - updateTask response status:', response.status);
-      console.log('API Service - updateTask response ok:', response.ok);
+      devLog('API Service - updateTask response status:', response.status);
+      devLog('API Service - updateTask response ok:', response.ok);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Service - updateTask error response:', errorText);
+        devError('API Service - updateTask error response:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       
       return this.handleResponse(response);
     } catch (error) {
-      console.error('API Service - updateTask error:', error);
+      devError('API Service - updateTask error:', error);
       throw error;
     }
   }

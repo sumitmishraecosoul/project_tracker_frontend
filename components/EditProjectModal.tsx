@@ -5,30 +5,58 @@ import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
 interface Project {
-  id: string;
+  _id: string;
   title: string;
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
   priority: 'Low' | 'Medium' | 'High';
   startDate: string;
   dueDate: string;
-  assignedTo?: string[];
+  assignedTo?: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    department: string;
+  }>;
+}
+
+interface ProjectFormData {
+  _id: string;
+  title: string;
+  description: string;
+  status: 'Active' | 'Completed' | 'On Hold';
+  priority: 'Low' | 'Medium' | 'High';
+  startDate: string;
+  dueDate: string;
+  assignedTo: string[];
 }
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
 }
 
 interface EditProjectModalProps {
   project: Project;
-  onSave: (project: Project) => void;
+  onSave: (project: ProjectFormData) => void;
   onClose: () => void;
 }
 
 export default function EditProjectModal({ project, onSave, onClose }: EditProjectModalProps) {
-  const [formData, setFormData] = useState<Project>(project);
+  const [formData, setFormData] = useState<ProjectFormData>({
+    _id: project._id,
+    title: project.title,
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    // Ensure dates are in YYYY-MM-DD format for date inputs
+    startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+    dueDate: project.dueDate ? new Date(project.dueDate).toISOString().split('T')[0] : '',
+    // Convert assignedTo to string array for form handling
+    assignedTo: project.assignedTo?.map(member => member._id) || []
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -52,7 +80,7 @@ export default function EditProjectModal({ project, onSave, onClose }: EditProje
     setLoading(false);
   };
 
-  const handleInputChange = (field: keyof Project, value: string | string[]) => {
+  const handleInputChange = (field: keyof ProjectFormData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -161,11 +189,11 @@ export default function EditProjectModal({ project, onSave, onClose }: EditProje
               <label className="block text-sm font-medium text-gray-700 mb-2">Assign Team Members</label>
               <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3">
                 {users.map((user) => (
-                  <label key={user.id} className="flex items-center space-x-3 py-2 cursor-pointer">
+                  <label key={user._id} className="flex items-center space-x-3 py-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.assignedTo?.includes(user.id) || false}
-                      onChange={() => handleUserToggle(user.id)}
+                      checked={formData.assignedTo?.includes(user._id) || false}
+                      onChange={() => handleUserToggle(user._id)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                     <div>
