@@ -12,6 +12,26 @@ interface DashboardStats {
   inProgressTasksCount: number;
   completedTasksCount: number;
   totalTeamMembersCount: number;
+  totalProjectsCount: number;
+  pendingTasksCount: number;
+  overdueTasksCount: number;
+}
+
+interface DashboardData {
+  activeProjectsCount: number;
+  totalTasksCount: number;
+  inProgressTasksCount: number;
+  completedTasksCount: number;
+  totalTeamMembersCount: number;
+  totalProjectsCount: number;
+  pendingTasksCount: number;
+  overdueTasksCount: number;
+  recentProjects: Project[];
+  taskProgress: {
+    completed: number;
+    inProgress: number;
+    total: number;
+  };
 }
 
 interface Project {
@@ -55,9 +75,13 @@ export default function Dashboard() {
     totalTasksCount: 0,
     inProgressTasksCount: 0,
     completedTasksCount: 0,
-    totalTeamMembersCount: 0
+    totalTeamMembersCount: 0,
+    totalProjectsCount: 0,
+    pendingTasksCount: 0,
+    overdueTasksCount: 0
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [taskProgress, setTaskProgress] = useState({ completed: 0, inProgress: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -67,49 +91,50 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Fetch all data in parallel
-      const [projects, tasks, users] = await Promise.all([
-        apiService.getProjects(),
-        apiService.getTasks(),
-        apiService.getUsers()
-      ]);
-
-      // Calculate stats
-      const activeProjects = Array.isArray(projects) 
-        ? projects.filter((p: any) => p.status === 'Active')
-        : projects.projects?.filter((p: any) => p.status === 'Active') || [];
-
-      const inProgressTasks = Array.isArray(tasks) 
-        ? tasks.filter((t: any) => t.status === 'In Progress')
-        : tasks.filter((t: any) => t.status === 'In Progress') || [];
-
-      const completedTasks = Array.isArray(tasks) 
-        ? tasks.filter((t: any) => t.status === 'Completed')
-        : tasks.filter((t: any) => t.status === 'Completed') || [];
-
-      const allProjects = Array.isArray(projects) ? projects : projects.projects || [];
-      const allTasks = Array.isArray(tasks) ? tasks : tasks || [];
-      const allUsers = Array.isArray(users) ? users : users || [];
-
+      // Use the new optimized dashboard API
+      const dashboardData: DashboardData = await apiService.getDashboardSummary();
+      
+      // Validate the response structure
+      if (!dashboardData || typeof dashboardData !== 'object') {
+        throw new Error('Invalid dashboard data received');
+      }
+      
+      // Set stats directly from API response with fallbacks
       setStats({
-        activeProjectsCount: activeProjects.length,
-        totalTasksCount: allTasks.length,
-        inProgressTasksCount: inProgressTasks.length,
-        completedTasksCount: completedTasks.length,
-        totalTeamMembersCount: allUsers.length
+        activeProjectsCount: dashboardData.activeProjectsCount || 0,
+        totalTasksCount: dashboardData.totalTasksCount || 0,
+        inProgressTasksCount: dashboardData.inProgressTasksCount || 0,
+        completedTasksCount: dashboardData.completedTasksCount || 0,
+        totalTeamMembersCount: dashboardData.totalTeamMembersCount || 0,
+        totalProjectsCount: dashboardData.totalProjectsCount || 0,
+        pendingTasksCount: dashboardData.pendingTasksCount || 0,
+        overdueTasksCount: dashboardData.overdueTasksCount || 0
       });
 
-      // Get recent projects (last 3)
-      const sortedProjects = allProjects
-        .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 3);
-      
-      setRecentProjects(sortedProjects);
+      // Set recent projects and task progress with fallbacks
+      setRecentProjects(dashboardData.recentProjects || []);
+      setTaskProgress(dashboardData.taskProgress || { completed: 0, inProgress: 0, total: 0 });
 
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
-      setError('Failed to load dashboard data');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data';
+      setError(errorMessage);
+      
+      // Set default values on error
+      setStats({
+        activeProjectsCount: 0,
+        totalTasksCount: 0,
+        inProgressTasksCount: 0,
+        completedTasksCount: 0,
+        totalTeamMembersCount: 0,
+        totalProjectsCount: 0,
+        pendingTasksCount: 0,
+        overdueTasksCount: 0
+      });
+      setRecentProjects([]);
+      setTaskProgress({ completed: 0, inProgress: 0, total: 0 });
     } finally {
       setLoading(false);
     }
@@ -165,8 +190,20 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-              <p className="text-gray-600">Overview of your projects and tasks</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+                  <p className="text-gray-600">Overview of your projects and tasks</p>
+                </div>
+                <button
+                  onClick={fetchDashboardData}
+                  disabled={loading}
+                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -275,14 +312,14 @@ export default function Dashboard() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Completed Tasks</span>
-                        <span className="text-sm text-gray-500">{stats.completedTasksCount}/{stats.totalTasksCount}</span>
+                        <span className="text-sm text-gray-500">{taskProgress.completed}/{taskProgress.total}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-green-600 h-2 rounded-full transition-all duration-300"
                           style={{ 
-                            width: stats.totalTasksCount > 0 
-                              ? `${(stats.completedTasksCount / stats.totalTasksCount) * 100}%` 
+                            width: taskProgress.total > 0 
+                              ? `${(taskProgress.completed / taskProgress.total) * 100}%` 
                               : '0%' 
                           }}
                         ></div>
@@ -293,14 +330,14 @@ export default function Dashboard() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">In Progress Tasks</span>
-                        <span className="text-sm text-gray-500">{stats.inProgressTasksCount}/{stats.totalTasksCount}</span>
+                        <span className="text-sm text-gray-500">{taskProgress.inProgress}/{taskProgress.total}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-orange-500 h-2 rounded-full transition-all duration-300"
                           style={{ 
-                            width: stats.totalTasksCount > 0 
-                              ? `${(stats.inProgressTasksCount / stats.totalTasksCount) * 100}%` 
+                            width: taskProgress.total > 0 
+                              ? `${(taskProgress.inProgress / taskProgress.total) * 100}%` 
                               : '0%' 
                           }}
                         ></div>

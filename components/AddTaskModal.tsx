@@ -28,12 +28,12 @@ interface Task {
 }
 
 interface Project {
-  id: string;
+  _id: string;
   title: string;
 }
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
 }
@@ -89,9 +89,23 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
   const fetchProjects = async () => {
     try {
       const data = await apiService.getProjects();
-      setProjects(data as Project[]);
+      console.log('AddTaskModal - Fetched projects data:', data);
+      
+      // Ensure data is an array - handle different response formats
+      let projectsData = [];
+      if (Array.isArray(data)) {
+        projectsData = data;
+      } else if (data && typeof data === 'object' && Array.isArray(data.projects)) {
+        projectsData = data.projects;
+      } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
+        projectsData = data.data;
+      }
+      console.log('AddTaskModal - Processed projects data:', projectsData);
+      
+      setProjects(projectsData as Project[]);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
+      setProjects([]); // Set empty array on error
     }
   };
 
@@ -157,7 +171,7 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
                 >
                   <option value="">Select a project</option>
                   {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
+                    <option key={project._id} value={project._id}>
                       {project.title}
                     </option>
                   ))}
@@ -260,7 +274,7 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
               >
                 <option value="">Select a user</option>
                 {users.map((user) => (
-                  <option key={user.id} value={user.id}>
+                  <option key={user._id} value={user._id}>
                     {user.name} ({user.email})
                   </option>
                 ))}

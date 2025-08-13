@@ -500,10 +500,15 @@ class ApiService {
   }
 
   async getTasksByProject(projectId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/tasks?projectId=${projectId}`, {
-      headers: this.getAuthHeader()
-    });
-    return this.handleResponse(response);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/tasks`, {
+        headers: this.getAuthHeader()
+      });
+      return await this.handleResponse(response);
+    } catch (error) {
+      devError('Failed to fetch project tasks:', error);
+      throw error;
+    }
   }
 
   async getTaskById(id: string) {
@@ -694,6 +699,19 @@ class ApiService {
       headers: this.getAuthHeader()
     });
     return this.handleResponse(response);
+  }
+
+  // New Dashboard Summary API - Single call for all dashboard data
+  async getDashboardSummary() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboard/summary`, {
+        headers: this.getAuthHeader()
+      });
+      return await this.handleResponse(response);
+    } catch (error) {
+      devError('Failed to fetch dashboard summary:', error);
+      throw error;
+    }
   }
 }
 
