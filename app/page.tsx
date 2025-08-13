@@ -3,7 +3,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '../components/Header';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 export default function ApplicationLauncher() {
@@ -18,7 +17,7 @@ export default function ApplicationLauncher() {
   }, [router]);
 
   const handleProjectTracker = () => {
-    router.push('/project-tracker');
+    router.push('/project-tracker/dashboard');
   };
 
   const handleExternalLink = (url: string) => {
@@ -67,16 +66,15 @@ export default function ApplicationLauncher() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        <Header />
         <div className="px-6 py-8">
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                Welcome to Your Workspace
+                Welcome to Your Worklytics
               </h1>
               <p className="text-xl text-gray-600">
-                Choose an application to get started
+                Choose an project to get started
               </p>
             </div>
 
@@ -99,9 +97,9 @@ export default function ApplicationLauncher() {
 
             {/* Footer Info */}
             <div className="mt-12 text-center">
-              <p className="text-gray-500 text-sm">
+              {/* <p className="text-gray-500 text-sm">
                 Click on any application to launch it. External applications will open in a new tab.
-              </p>
+              </p> */}
             </div>
           </div>
         </div>
