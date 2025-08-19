@@ -36,9 +36,9 @@ interface Task {
   projectId: string;
   task: string;
   description?: string;
-  taskType?: string;
+  taskType?: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: string;
-  status: string;
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: {
     _id: string;
     name: string;
@@ -107,21 +107,21 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
           try {
             const tasksResponse = await apiService.getProjectTasks(projectId);
             console.log('Separate tasks response:', tasksResponse);
-            if (Array.isArray(tasksResponse) && tasksResponse.length > 0) {
-              setTasks(tasksResponse);
+             if (Array.isArray(tasksResponse) && tasksResponse.length > 0) {
+               setTasks(tasksResponse as unknown as Task[]);
               console.log('Tasks set from separate call:', tasksResponse);
             } else {
               // Last resort: fetch all tasks and filter
               console.log('Trying to fetch all tasks and filter...');
               const allTasks = await apiService.getTasks();
               console.log('All tasks in database:', allTasks);
-              const projectTasks = allTasks.filter((task: any) => {
+               const projectTasks = allTasks.filter((task: any) => {
                 console.log(`Checking task ${task.task}: projectId=${task.projectId}, projectId=${projectId}`);
                 return task.projectId === projectId || task.projectId === response.project._id;
               });
-              console.log('Filtered tasks for this project:', projectTasks);
-              if (projectTasks.length > 0) {
-                setTasks(projectTasks);
+               console.log('Filtered tasks for this project:', projectTasks);
+               if (projectTasks.length > 0) {
+                 setTasks(projectTasks as unknown as Task[]);
                 console.log('Tasks set from filtered results:', projectTasks);
               }
             }
@@ -160,7 +160,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveTask = (updatedTask: Task) => {
+  const handleSaveTask = (updatedTask: any) => {
     const saveTask = async () => {
       try {
         console.log('Saving updated task:', updatedTask);
@@ -351,32 +351,32 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
                       <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.description}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.taskType === 'Bug'
-                            ? 'bg-red-100 text-red-800'
-                            : task.taskType === 'Feature'
-                            ? 'bg-blue-100 text-blue-800'
-                            : task.taskType === 'Enhancement'
-                            ? 'bg-purple-100 text-purple-800'
-                            : task.taskType === 'Documentation'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                           task.taskType === 'Daily'
+                             ? 'bg-blue-100 text-blue-800'
+                             : task.taskType === 'Weekly'
+                             ? 'bg-purple-100 text-purple-800'
+                             : task.taskType === 'Monthly'
+                             ? 'bg-green-100 text-green-800'
+                             : 'bg-gray-100 text-gray-800'
+                         }`}>
                           {task.taskType}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.status === 'Completed' 
-                            ? 'bg-green-100 text-green-800'
-                            : task.status === 'In Progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : task.status === 'Blocked'
-                            ? 'bg-red-100 text-red-800'
-                            : task.status === 'On Hold'
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
+                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                           task.status === 'Completed' 
+                             ? 'bg-green-100 text-green-800'
+                             : task.status === 'In Progress'
+                             ? 'bg-yellow-100 text-yellow-800'
+                             : task.status === 'Blocked'
+                             ? 'bg-red-100 text-red-800'
+                             : task.status === 'On Hold'
+                             ? 'bg-orange-100 text-orange-800'
+                             : task.status === 'Cancelled'
+                             ? 'bg-gray-200 text-gray-800'
+                             : 'bg-gray-100 text-gray-800'
+                         }`}>
                           {task.status}
                         </span>
                       </td>

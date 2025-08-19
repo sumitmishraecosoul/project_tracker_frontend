@@ -18,14 +18,14 @@ interface Project {
   startDate: string;
 }
 
-interface Task {
+  interface Task {
   id: string;
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+    taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+    status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: string;
   reporter: string;
   startDate?: string;
@@ -228,13 +228,11 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.task}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.taskType === 'Bug'
-                            ? 'bg-red-100 text-red-800'
-                            : task.taskType === 'Feature'
+                          task.taskType === 'Daily'
                             ? 'bg-blue-100 text-blue-800'
-                            : task.taskType === 'Enhancement'
+                            : task.taskType === 'Weekly'
                             ? 'bg-purple-100 text-purple-800'
-                            : task.taskType === 'Documentation'
+                            : task.taskType === 'Monthly'
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
@@ -248,11 +246,12 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
                           className="text-sm border border-gray-300 rounded px-2 py-1"
                         >
-                          <option value="To Do">To Do</option>
+                          <option value="Yet to Start">Yet to Start</option>
                           <option value="In Progress">In Progress</option>
                           <option value="Completed">Completed</option>
                           <option value="Blocked">Blocked</option>
                           <option value="On Hold">On Hold</option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

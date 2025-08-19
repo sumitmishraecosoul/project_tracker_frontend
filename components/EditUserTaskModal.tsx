@@ -26,11 +26,11 @@ interface Task {
   id: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
-  assignedTo: string;
-  reporter: string;
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
+  assignedTo?: { _id: string; name: string; email: string } | string;
+  reporter?: { _id: string; name: string; email: string } | string;
   startDate?: string;
   eta: string;
   estimatedHours?: number;
@@ -48,9 +48,9 @@ interface NewTaskData {
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: string;
   reporter: string;
   startDate?: string;
@@ -77,9 +77,9 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
     projectId: '',
     task: '',
     description: '',
-    taskType: 'Feature',
+    taskType: 'Daily',
     priority: 'Medium',
-    status: 'To Do',
+    status: 'Yet to Start',
     assignedTo: '',
     reporter: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -99,6 +99,14 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  // If Daily chosen in create-new inline form, default dates to today
+  useEffect(() => {
+    if (newTaskData.taskType === 'Daily') {
+      const today = new Date().toISOString().split('T')[0];
+      setNewTaskData(prev => ({ ...prev, startDate: today, eta: today }));
+    }
+  }, [newTaskData.taskType]);
 
   useEffect(() => {
     if (formData.project) {
@@ -151,7 +159,7 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
       
       // Ensure data is an array
       const tasksData = Array.isArray(data) ? data : [];
-      setTasks(tasksData as Task[]);
+      setTasks(tasksData as unknown as Task[]);
     } catch (error) {
       console.error('Failed to fetch project tasks:', error);
       // Fallback: try to get all tasks and filter
@@ -162,7 +170,7 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
         const allTasksArray = Array.isArray(allTasks) ? allTasks : [];
         const filteredTasks = allTasksArray.filter((task: any) => task.projectId === projectId);
         console.log('Fallback filtered tasks:', filteredTasks);
-        setTasks(filteredTasks as Task[]);
+        setTasks(filteredTasks as unknown as Task[]);
       } catch (fallbackError) {
         console.error('Fallback also failed:', fallbackError);
         setTasks([]);
@@ -413,11 +421,10 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                     onChange={(e) => handleNewTaskInputChange('taskType', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="Feature">Feature</option>
-                    <option value="Bug">Bug</option>
-                    <option value="Enhancement">Enhancement</option>
-                    <option value="Documentation">Documentation</option>
-                    <option value="Research">Research</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Adhoc">Adhoc</option>
                   </select>
                 </div>
 
@@ -442,11 +449,12 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                     onChange={(e) => handleNewTaskInputChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="To Do">To Do</option>
+                    <option value="Yet to Start">Yet to Start</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Completed">Completed</option>
                     <option value="Blocked">Blocked</option>
                     <option value="On Hold">On Hold</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
 
@@ -501,8 +509,8 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                     type="number"
                     min="0"
                     step="0.5"
-                    value={newTaskData.estimatedHours}
-                    onChange={(e) => handleNewTaskInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                    value={newTaskData.estimatedHours ?? ''}
+                    onChange={(e) => handleNewTaskInputChange('estimatedHours', e.target.value === '' ? undefined as any : parseFloat(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
@@ -514,8 +522,8 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                     type="number"
                     min="0"
                     step="0.5"
-                    value={newTaskData.actualHours}
-                    onChange={(e) => handleNewTaskInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                    value={newTaskData.actualHours ?? ''}
+                    onChange={(e) => handleNewTaskInputChange('actualHours', e.target.value === '' ? undefined as any : parseFloat(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />

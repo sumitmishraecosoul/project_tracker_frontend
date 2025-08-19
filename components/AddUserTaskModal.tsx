@@ -20,9 +20,9 @@ interface NewTaskData {
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: string;
   reporter: string;
   startDate?: string;
@@ -54,9 +54,9 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
     projectId: '',
     task: '',
     description: '',
-    taskType: 'Feature',
+    taskType: 'Daily',
     priority: 'Medium',
-    status: 'To Do',
+    status: 'Yet to Start',
     assignedTo: '',
     reporter: '',
     startDate: new Date().toISOString().split('T')[0],
@@ -78,6 +78,14 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
     fetchUsers();
     getCurrentUser();
   }, []);
+
+  // If Daily is selected, default dates to today
+  useEffect(() => {
+    if (newTaskData.taskType === 'Daily') {
+      const today = new Date().toISOString().split('T')[0];
+      setNewTaskData(prev => ({ ...prev, startDate: today, eta: today }));
+    }
+  }, [newTaskData.taskType]);
 
   // Set default reporter when current user is available
   useEffect(() => {
@@ -127,6 +135,16 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
 
   const handleNewTaskInputChange = (field: keyof NewTaskData, value: any) => {
     setNewTaskData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleHoursChange = (field: 'estimatedHours' | 'actualHours', value: string) => {
+    if (value === '') {
+      setNewTaskData(prev => ({ ...prev, [field]: undefined as any }));
+      return;
+    }
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return;
+    setNewTaskData(prev => ({ ...prev, [field]: parsed }));
   };
 
   const handleCreateTask = async () => {
@@ -282,11 +300,10 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
                   onChange={(e) => handleNewTaskInputChange('taskType', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="Feature">Feature</option>
-                  <option value="Bug">Bug</option>
-                  <option value="Enhancement">Enhancement</option>
-                  <option value="Documentation">Documentation</option>
-                  <option value="Research">Research</option>
+                  <option value="Daily">Daily</option>
+                  <option value="Weekly">Weekly</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Adhoc">Adhoc</option>
                 </select>
               </div>
 
@@ -313,11 +330,12 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
                   onChange={(e) => handleNewTaskInputChange('status', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="To Do">To Do</option>
+                  <option value="Yet to Start">Yet to Start</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -395,12 +413,12 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
-                <input
+                  <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={newTaskData.estimatedHours}
-                  onChange={(e) => handleNewTaskInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                    value={newTaskData.estimatedHours ?? ''}
+                    onChange={(e) => handleHoursChange('estimatedHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
@@ -408,12 +426,12 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
-                <input
+                  <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={newTaskData.actualHours}
-                  onChange={(e) => handleNewTaskInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                    value={newTaskData.actualHours ?? ''}
+                    onChange={(e) => handleHoursChange('actualHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
@@ -438,7 +456,7 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
                 onChange={(e) => handleNewTaskInputChange('roadBlock', e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Describe any roadblocks"
+                placeholder="Describe any roadbloacks ('Feature', 'Bug', 'Enhancement', 'Documentation', 'Research',)"
               />
             </div>
 

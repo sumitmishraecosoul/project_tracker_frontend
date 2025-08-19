@@ -9,9 +9,9 @@ interface Task {
   projectId: string;
   task: string;
   description?: string;
-  taskType?: string;
+  taskType?: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: string;
-  status: string;
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: {
     _id: string;
     name: string;
@@ -65,6 +65,18 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
     fetchUsers();
   }, []);
 
+  // If Daily selected, default dates to today
+  useEffect(() => {
+    if (formData.taskType === 'Daily') {
+      const today = new Date().toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        startDate: today,
+        eta: today
+      }));
+    }
+  }, [formData.taskType]);
+
   const fetchUsers = async () => {
     try {
       const data = await apiService.getUsers();
@@ -83,6 +95,16 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
   const handleInputChange = (field: keyof Task, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleHoursChange = (field: 'estimatedHours' | 'actualHours', value: string) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, [field]: undefined }));
+      return;
+    }
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return;
+    setFormData(prev => ({ ...prev, [field]: parsed }));
   };
 
   const handleUserChange = (field: 'assignedTo' | 'reporter', userId: string) => {
@@ -141,17 +163,16 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
                 <select
                   value={formData.taskType}
                   onChange={(e) => handleInputChange('taskType', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="Feature">Feature</option>
-                  <option value="Bug">Bug</option>
-                  <option value="Enhancement">Enhancement</option>
-                  <option value="Documentation">Documentation</option>
-                  <option value="Research">Research</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Adhoc">Adhoc</option>
                 </select>
               </div>
 
@@ -172,17 +193,18 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => handleInputChange('status', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="To Do">To Do</option>
+                <option value="Yet to Start">Yet to Start</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
+                <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -247,12 +269,12 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
-                <input
+                 <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={formData.estimatedHours || 0}
-                  onChange={(e) => handleInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                   value={formData.estimatedHours ?? ''}
+                   onChange={(e) => handleHoursChange('estimatedHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
@@ -260,12 +282,12 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
-                <input
+                 <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={formData.actualHours || 0}
-                  onChange={(e) => handleInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                   value={formData.actualHours ?? ''}
+                   onChange={(e) => handleHoursChange('actualHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
@@ -290,7 +312,7 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                 onChange={(e) => handleInputChange('roadBlock', e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Describe any roadblocks"
+                placeholder="Describe any roadbloacks ('Feature', 'Bug', 'Enhancement', 'Documentation', 'Research',)"
               />
             </div>
 

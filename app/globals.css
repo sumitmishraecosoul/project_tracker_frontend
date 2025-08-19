@@ -2,3 +2,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Gantt styles */
+.gantt-bar {
+  height: 12px;
+  border-radius: 9999px;
+  position: relative;
+}
+
+.gantt-timeline {
+  position: relative;
+  width: calc(100%);
+  background-image: linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: calc(100% / 12) 100%;
+}
+
+.gantt-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255,255,255,0.2) 0,
+    rgba(255,255,255,0.2) 6px,
+    rgba(255,255,255,0.35) 6px,
+    rgba(255,255,255,0.35) 12px
+  );
+}
+
+@keyframes gantt-grow {
+  from { transform: scaleX(0.2); opacity: 0.4; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+.animate-gantt-grow {
+  transform-origin: left center;
+  animation: gantt-grow 400ms ease-out;
+}

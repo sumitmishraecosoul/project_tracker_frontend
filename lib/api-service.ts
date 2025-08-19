@@ -485,9 +485,16 @@ class ApiService {
   }
 
   // Task APIs
-  async getTasks(): Promise<Task[]> {
+  async getTasks(params?: { status?: string; taskType?: string; view?: string; projectId?: string; assignedTo?: string }): Promise<Task[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+      const query = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') query.append(key, value);
+        });
+      }
+      const url = `${API_BASE_URL}/api/tasks${query.toString() ? `?${query.toString()}` : ''}`;
+      const response = await fetch(url, {
         headers: this.getAuthHeader()
       });
       const data = await this.handleResponse(response);

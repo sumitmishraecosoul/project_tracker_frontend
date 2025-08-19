@@ -8,9 +8,9 @@ interface Task {
   projectId: string;
   task: string;
   description?: string;
-  taskType: 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research';
+  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: string;
   reporter: string;
   startDate?: string;
@@ -49,9 +49,9 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     projectId: projectId || '',
     task: '',
     description: '',
-    taskType: 'Feature' as 'Feature' | 'Bug' | 'Enhancement' | 'Documentation' | 'Research',
+    taskType: 'Daily' as 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc',
     priority: 'Medium' as 'Critical' | 'High' | 'Medium' | 'Low',
-    status: 'To Do' as 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold',
+    status: 'Yet to Start' as 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled',
     assignedTo: '',
     reporter: '',
     startDate: '',
@@ -78,6 +78,18 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     fetchUsers();
     getCurrentUser();
   }, []);
+
+  // If Daily is selected, default dates to today
+  useEffect(() => {
+    if (formData.taskType === 'Daily') {
+      const today = new Date().toISOString().split('T')[0];
+      setFormData(prev => ({
+        ...prev,
+        startDate: today,
+        eta: today
+      }));
+    }
+  }, [formData.taskType]);
 
   const getCurrentUser = () => {
     const user = localStorage.getItem('currentUser');
@@ -143,6 +155,18 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleHoursChange = (field: 'estimatedHours' | 'actualHours', value: string) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, [field]: '' as any }));
+      return;
+    }
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) {
+      return;
+    }
+    setFormData(prev => ({ ...prev, [field]: parsed as any }));
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -206,17 +230,16 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Task Type</label>
                 <select
                   value={formData.taskType}
                   onChange={(e) => handleInputChange('taskType', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="Feature">Feature</option>
-                  <option value="Bug">Bug</option>
-                  <option value="Enhancement">Enhancement</option>
-                  <option value="Documentation">Documentation</option>
-                  <option value="Research">Research</option>
+                  <option value="Daily">Daily</option>
+                  <option value="Weekly">Weekly</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Adhoc">Adhoc</option>
                 </select>
               </div>
 
@@ -243,11 +266,12 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
                   onChange={(e) => handleInputChange('status', e.target.value)}
                   className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="To Do">To Do</option>
+                  <option value="Yet to Start">Yet to Start</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Completed">Completed</option>
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -306,26 +330,26 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
                 <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={formData.estimatedHours}
-                  onChange={(e) => handleInputChange('estimatedHours', parseFloat(e.target.value) || 0)}
+                   value={formData.estimatedHours ?? ''}
+                   onChange={(e) => handleHoursChange('estimatedHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Actual Hours</label>
                 <input
                   type="number"
                   min="0"
                   step="0.5"
-                  value={formData.actualHours}
-                  onChange={(e) => handleInputChange('actualHours', parseFloat(e.target.value) || 0)}
+                   value={formData.actualHours ?? ''}
+                   onChange={(e) => handleHoursChange('actualHours', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="0"
                 />
@@ -350,7 +374,7 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
                 onChange={(e) => handleInputChange('roadBlock', e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Describe any roadblocks"
+                placeholder="Describe any roadbloacks ('Feature', 'Bug', 'Enhancement', 'Documentation', 'Research',)"
               />
             </div>
 

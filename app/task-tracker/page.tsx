@@ -14,9 +14,9 @@ interface Task {
   projectId: string;
   task: string;
   description?: string;
-  taskType?: string;
+  taskType?: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: string;
-  status: string;
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
   assignedTo: {
     _id: string;
     name: string;
@@ -56,7 +56,11 @@ export default function TaskTracker() {
   const [users, setUsers] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeUserId, setActiveUserId] = useState<string>('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'in progress' | 'completed'>('all');
+  const [activeTaskTab, setActiveTaskTab] = useState<'All Tasks' | 'Daily Tasks' | 'Weekly Tasks' | 'Monthly Tasks' | 'Adhoc Tasks'>('All Tasks');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled'>('All');
+  const [projectMap, setProjectMap] = useState<Record<string, string>>({});
+  const [projectsList, setProjectsList] = useState<Array<{ id: string; title: string }>>([]);
+  const [projectFilter, setProjectFilter] = useState<string>('All Projects');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -71,7 +75,26 @@ export default function TaskTracker() {
     if (activeUserId) {
       fetchTasks();
     }
-  }, [activeUserId]);
+  }, [activeUserId, activeTaskTab, statusFilter, projectFilter]);
+
+  useEffect(() => {
+    const fetchProjectsMap = async () => {
+      try {
+        const data = await apiService.getProjects();
+        const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
+        const map: Record<string, string> = {};
+        (arr || []).forEach((p: any) => {
+          if (p && (p._id || p.id)) {
+            map[p._id || p.id] = p.title;
+          }
+        });
+        setProjectMap(map);
+        const list = (arr || []).map((p: any) => ({ id: p._id || p.id, title: p.title }));
+        setProjectsList(list);
+      } catch {}
+    };
+    fetchProjectsMap();
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -106,7 +129,19 @@ export default function TaskTracker() {
     setLoading(true);
     try {
       console.log('Calling apiService.getTasks()...');
-      const data = await apiService.getTasks();
+      const typeParam =
+        activeTaskTab === 'All Tasks' ? 'All' :
+        activeTaskTab === 'Daily Tasks' ? 'Daily' :
+        activeTaskTab === 'Weekly Tasks' ? 'Weekly' :
+        activeTaskTab === 'Monthly Tasks' ? 'Monthly' :
+        'Adhoc';
+      const projectIdParam = projectFilter && projectFilter !== 'All Projects' ? projectFilter : undefined;
+      const data = await apiService.getTasks({
+        assignedTo: activeUserId,
+        taskType: typeParam,
+        status: statusFilter === 'All' ? '' : statusFilter,
+        projectId: projectIdParam
+      });
       console.log('All tasks fetched from API:', data);
       console.log('Tasks data type:', typeof data);
       console.log('Tasks is array:', Array.isArray(data));
@@ -132,7 +167,7 @@ export default function TaskTracker() {
       }
       
       // Filter tasks assigned to the active user
-      const userTasks = data.filter((task: any) => {
+      let userTasks = data.filter((task: any) => {
         console.log(`Checking task ${task.task || task.title}: assignedTo=`, task.assignedTo);
         console.log(`Active user:`, activeUser);
         
@@ -160,6 +195,10 @@ export default function TaskTracker() {
         console.log(`Task ${task.task} does not match`);
         return false;
       });
+      // Apply project filter on the client if selected
+      if (projectFilter && projectFilter !== 'All Projects') {
+        userTasks = userTasks.filter((task: any) => task.projectId === projectFilter);
+      }
       
       console.log('Tasks filtered for user:', userTasks);
       console.log('Active user:', activeUser);
@@ -172,19 +211,12 @@ export default function TaskTracker() {
   };
 
   const activeUser = users.find(user => user._id === activeUserId);
-  const filteredTasks = Array.isArray(tasks) ? tasks.filter(task => {
-    console.log(`Filtering task "${task.task}": status="${task.status}", activeFilter="${activeFilter}"`);
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'pending' && task.status === 'To Do') return true;
-    if (activeFilter === 'in progress' && task.status === 'In Progress') return true;
-    if (activeFilter === 'completed' && task.status === 'Completed') return true;
-    return false;
-  }) : [];
+  const filteredTasks = Array.isArray(tasks) ? tasks : [];
   
   console.log('=== Task Display Debug ===');
   console.log('Active user:', activeUser);
   console.log('All tasks for user:', tasks);
-  console.log('Active filter:', activeFilter);
+  console.log('Active task tab:', activeTaskTab);
   console.log('Filtered tasks:', filteredTasks);
   console.log('Tasks array length:', tasks.length);
   console.log('Filtered tasks length:', filteredTasks.length);
@@ -217,7 +249,7 @@ export default function TaskTracker() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveTask = (updatedTask: Task) => {
+  const handleSaveTask = (updatedTask: any) => {
     const saveTask = async () => {
       try {
         console.log('Saving updated task:', updatedTask);
@@ -318,20 +350,53 @@ export default function TaskTracker() {
               )}
 
               <div className="p-6">
-                <div className="flex space-x-1 mb-6 bg-gray-100 rounded-full p-1 w-fit">
-                  {['all', 'pending', 'in progress', 'completed'].map((filter) => (
-                    <button
-                      key={filter}
-                      onClick={() => setActiveFilter(filter as any)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer whitespace-nowrap transition-colors ${
-                        activeFilter === filter
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      {filter.charAt(0).toUpperCase() + filter.slice(1)} Tasks
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex space-x-1 bg-gray-100 rounded-full p-1 w-fit">
+                    {(['All Tasks','Daily Tasks','Weekly Tasks','Monthly Tasks','Adhoc Tasks'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTaskTab(tab)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer whitespace-nowrap transition-colors ${
+                          activeTaskTab === tab
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1 text-right">Project</label>
+                      <select
+                        value={projectFilter}
+                        onChange={(e) => setProjectFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-md text-sm min-w-[200px]"
+                      >
+                        <option value="All Projects">All Projects</option>
+                        {projectsList.map((p) => (
+                          <option key={p.id} value={p.id}>{p.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1 text-right">Status</label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option>All</option>
+                        <option>Yet to Start</option>
+                        <option>In Progress</option>
+                        <option>Completed</option>
+                        <option>Blocked</option>
+                        <option>On Hold</option>
+                        <option>Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -340,16 +405,15 @@ export default function TaskTracker() {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporter</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
@@ -365,34 +429,35 @@ export default function TaskTracker() {
                           <tr key={task._id || `task-${index}`} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{projectMap[task.projectId] || task.projectId}</td>
                             <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.description}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                task.taskType === 'Bug'
-                                  ? 'bg-red-100 text-red-800'
-                                  : task.taskType === 'Feature'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : task.taskType === 'Enhancement'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : task.taskType === 'Documentation'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          task.taskType === 'Daily'
+                            ? 'bg-blue-100 text-blue-800'
+                            : task.taskType === 'Weekly'
+                            ? 'bg-purple-100 text-purple-800'
+                            : task.taskType === 'Monthly'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
                                 {task.taskType}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                task.status === 'Completed' 
-                                  ? 'bg-green-100 text-green-800'
-                                  : task.status === 'In Progress'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : task.status === 'Blocked'
-                                  ? 'bg-red-100 text-red-800'
-                                  : task.status === 'On Hold'
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          task.status === 'Completed' 
+                            ? 'bg-green-100 text-green-800'
+                            : task.status === 'In Progress'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : task.status === 'Blocked'
+                            ? 'bg-red-100 text-red-800'
+                            : task.status === 'On Hold'
+                            ? 'bg-orange-100 text-orange-800'
+                            : task.status === 'Cancelled'
+                            ? 'bg-gray-200 text-gray-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
                                 {task.status}
                               </span>
                             </td>
@@ -410,9 +475,6 @@ export default function TaskTracker() {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {task.assignedTo?.name || 'Unassigned'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {task.reporter?.name || 'Unknown'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -423,9 +485,6 @@ export default function TaskTracker() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {task.actualHours || 0}/{task.estimatedHours || 0}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {task.sprint || 'Not set'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-3">
@@ -452,7 +511,7 @@ export default function TaskTracker() {
                       ) : (
                         <tr>
                           <td colSpan={13} className="px-6 py-8 text-center text-gray-500">
-                            {Array.isArray(filteredTasks) ? `No ${activeFilter} tasks found for this user.` : 'No tasks available.'}
+                            {Array.isArray(filteredTasks) ? `No ${activeTaskTab} found for this user.` : 'No tasks available.'}
                           </td>
                         </tr>
                       )}
