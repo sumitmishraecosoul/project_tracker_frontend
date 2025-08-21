@@ -6,67 +6,7 @@ import Header from '../../../components/Header';
 import AddUserTaskModal from '../../../components/AddUserTaskModal';
 import EditTaskModal from '../../../components/EditTaskModal';
 import { apiService } from '../../../lib/api-service';
-
-interface Project {
-  _id: string;
-  id?: string;
-  title: string;
-  description: string;
-  status: 'Active' | 'Completed' | 'On Hold';
-  priority: 'Low' | 'Medium' | 'High';
-  department?: string;
-  createdBy?: {
-    _id: string;
-    name: string;
-    email: string;
-  };
-  assignedTo?: Array<{
-    _id: string;
-    name: string;
-    email: string;
-  }>;
-  startDate: string;
-  dueDate: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface Task {
-  _id: string;
-  id: string;
-  projectId: string;
-  task: string;
-  description?: string;
-  taskType?: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  priority: string;
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
-  assignedTo: {
-    _id: string;
-    name: string;
-    email: string;
-    department?: string;
-  };
-  reporter: {
-    _id: string;
-    name: string;
-    email: string;
-    department?: string;
-  };
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  remark?: string;
-  roadBlock?: string;
-  supportNeeded?: string;
-  labels?: string[];
-  attachments?: string[];
-  relatedTasks?: string[];
-  parentTask?: string;
-  sprint?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { Project, Task, NewTask } from '../../../lib/types';
 
 interface ProjectDetailProps {
   projectId: string;

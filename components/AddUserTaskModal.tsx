@@ -2,43 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
-
-interface Project {
-  _id: string;
-  id?: string;
-  title: string;
-}
-
-interface User {
-  _id: string;
-  id?: string;
-  name: string;
-  email: string;
-  assignable?: boolean;
-}
-
-interface NewTaskData {
-  projectId: string;
-  task: string;
-  description?: string;
-  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
-  assignedTo: string;
-  reporter: string;
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  remark?: string;
-  roadBlock?: string;
-  supportNeeded?: string;
-  labels?: string[];
-  attachments?: string[];
-  relatedTasks?: string[];
-  parentTask?: string;
-  sprint?: string;
-}
+import { Project, User, NewTask } from '../lib/types';
 
 interface AddUserTaskModalProps {
   userId?: string;
@@ -53,7 +17,7 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState('');
-  const [newTaskData, setNewTaskData] = useState<NewTaskData>({
+  const [newTaskData, setNewTaskData] = useState<NewTask>({
     projectId: projectId || '', // Use projectId if provided
     task: '',
     description: '',
@@ -156,7 +120,7 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
     }
   };
 
-  const handleNewTaskInputChange = (field: keyof NewTaskData, value: any) => {
+  const handleNewTaskInputChange = (field: keyof NewTask, value: any) => {
     setNewTaskData(prev => ({ ...prev, [field]: value }));
   };
 

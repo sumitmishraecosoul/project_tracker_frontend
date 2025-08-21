@@ -1,3 +1,13 @@
 {
-  "/project-tracker/dashboard/page": "app/project-tracker/dashboard/page.js"
+  "/api/health/route": "app/api/health/route.js",
+  "/login/page": "app/login/page.js",
+  "/project-tracker/dashboard/page": "app/project-tracker/dashboard/page.js",
+  "/page": "app/page.js",
+  "/task-tracker/page": "app/task-tracker/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/simple/page": "app/simple/page.js",
+  "/project-tracker/page": "app/project-tracker/page.js",
+  "/signup/page": "app/signup/page.js",
+  "/test/page": "app/test/page.js",
+  "/project-tracker/[id]/page": "app/project-tracker/[id]/page.js"
 }

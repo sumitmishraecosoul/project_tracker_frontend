@@ -1,0 +1,13 @@
+{
+  "/api/health/route": "/api/health",
+  "/login/page": "/login",
+  "/project-tracker/dashboard/page": "/project-tracker/dashboard",
+  "/page": "/",
+  "/task-tracker/page": "/task-tracker",
+  "/_not-found/page": "/_not-found",
+  "/simple/page": "/simple",
+  "/project-tracker/page": "/project-tracker",
+  "/signup/page": "/signup",
+  "/test/page": "/test",
+  "/project-tracker/[id]/page": "/project-tracker/[id]"
+}

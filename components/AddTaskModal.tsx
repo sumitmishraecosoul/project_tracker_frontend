@@ -2,46 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
-
-interface Task {
-  _id: string;
-  id: string;
-  projectId: string;
-  task: string;
-  description?: string;
-  taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
-  assignedTo: string;
-  reporter: string;
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  remark?: string;
-  roadBlock?: string;
-  supportNeeded?: string;
-  labels: string[];
-  attachments: string[];
-  relatedTasks: string[];
-  parentTask?: string;
-  sprint?: string;
-}
-
-interface Project {
-  _id: string;
-  title: string;
-}
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-}
+import { Project, User, NewTask } from '../lib/types';
 
 interface AddTaskModalProps {
   projectId?: string;
-  onSave: (task: Omit<Task, 'id' | '_id'>) => void;
+  onSave: (task: NewTask) => void;
   onClose: () => void;
 }
 

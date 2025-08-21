@@ -6,42 +6,7 @@ import Header from '../../../components/Header';
 import EditTaskModal from '../../../components/EditTaskModal';
 import AddTaskModal from '../../../components/AddTaskModal';
 import { apiService } from '../../../lib/api-service';
-
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  status: 'Active' | 'Completed' | 'On Hold';
-  createdDate: string;
-  dueDate: string;
-  priority: string;
-  startDate: string;
-}
-
-  interface Task {
-  _id: string;
-  id: string;
-  projectId: string;
-  task: string;
-  description?: string;
-    taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-    status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
-  assignedTo: string;
-  reporter: string;
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  remark?: string;
-  roadBlock?: string;
-  supportNeeded?: string;
-  labels: string[];
-  attachments: string[];
-  relatedTasks: string[];
-  parentTask?: string;
-  sprint?: string;
-}
+import { Project, Task, NewTask } from '../../../lib/types';
 
 export default function ProjectDetail({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -70,7 +35,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     setLoading(false);
   };
 
-  const handleAddTask = async (newTaskData: Omit<Task, 'id' | '_id'>) => {
+  const handleAddTask = async (newTaskData: NewTask) => {
     try {
       const taskData = {
         ...newTaskData,
@@ -268,7 +233,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
                           {task.priority}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.assignedTo.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {task.actualHours || 0}h / {task.estimatedHours || 0}h
                       </td>

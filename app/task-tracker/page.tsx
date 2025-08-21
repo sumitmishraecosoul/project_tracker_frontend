@@ -8,53 +8,7 @@ import EditTaskModal from '../../components/EditTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 import { DEPARTMENTS } from '../../lib/constants';
-
-interface Task {
-  _id: string;
-  id: string;
-  projectId: string;
-  task: string;
-  description?: string;
-  taskType?: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
-  priority: string;
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
-  assignedTo: {
-    _id: string;
-    name: string;
-    email: string;
-    department?: string;
-  };
-  reporter: {
-    _id: string;
-    name: string;
-    email: string;
-    department?: string;
-  };
-  startDate?: string;
-  eta: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  remark?: string;
-  roadBlock?: string;
-  supportNeeded?: string;
-  labels?: string[];
-  attachments?: string[];
-  relatedTasks?: string[];
-  parentTask?: string;
-  sprint?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface User {
-  _id: string;
-  id?: string;
-  name: string;
-  email: string;
-  role: string;
-  department: string;
-  assignable?: boolean;
-}
+import { Task, User } from '../../lib/types';
 
 export default function TaskTracker() {
   const [users, setUsers] = useState<User[]>([]);
