@@ -1,1 +1,3 @@
-{}
+{
+  "/project-tracker/dashboard/page": "app/project-tracker/dashboard/page.js"
+}

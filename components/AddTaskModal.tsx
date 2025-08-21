@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
 interface Task {
+  _id: string;
   id: string;
   projectId: string;
   task: string;
@@ -40,7 +41,7 @@ interface User {
 
 interface AddTaskModalProps {
   projectId?: string;
-  onSave: (task: Omit<Task, 'id'>) => void;
+  onSave: (task: Omit<Task, 'id' | '_id'>) => void;
   onClose: () => void;
 }
 

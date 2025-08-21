@@ -70,7 +70,7 @@ export default function ProjectDetail({ projectId }: { projectId: string }) {
     setLoading(false);
   };
 
-  const handleAddTask = async (newTaskData: Omit<Task, 'id' | 'projectId'>) => {
+  const handleAddTask = async (newTaskData: Omit<Task, 'id' | '_id'>) => {
     try {
       const taskData = {
         ...newTaskData,
