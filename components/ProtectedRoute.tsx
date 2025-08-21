@@ -14,10 +14,17 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('ProtectedRoute: Checking authentication...');
     const user = localStorage.getItem('currentUser');
-    if (user) {
+    const token = localStorage.getItem('token');
+    console.log('ProtectedRoute: User exists:', !!user);
+    console.log('ProtectedRoute: Token exists:', !!token);
+    
+    if (user && token) {
+      console.log('ProtectedRoute: User authenticated, setting state...');
       setIsAuthenticated(true);
     } else {
+      console.log('ProtectedRoute: No user or token, redirecting to login...');
       router.push('/login');
       return;
     }

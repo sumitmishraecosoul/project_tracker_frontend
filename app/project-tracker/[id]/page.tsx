@@ -10,5 +10,6 @@ export async function generateStaticParams() {
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  console.log('ProjectPage component - received project ID:', id);
   return <ProjectDetail projectId={id} />;
 }

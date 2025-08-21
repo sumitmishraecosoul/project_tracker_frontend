@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { apiService } from '../../lib/api-service';
 
 export default function LoginPage() {
@@ -34,11 +35,16 @@ export default function LoginPage() {
     }
 
     try {
+      console.log('Attempting login with:', { email: formData.email });
       const data = await apiService.login(formData);
+      console.log('Login response:', data);
       
       // Handle various token/user shapes
       const token = data?.token || data?.accessToken || data?.jwt || data?.data?.token;
       const user = data?.user || data?.data?.user || data?.profile || data;
+
+      console.log('Extracted token:', token ? 'Present' : 'Missing');
+      console.log('Extracted user:', user);
 
       if (!token) {
         throw new Error('Authentication succeeded but no token was returned.');
@@ -48,6 +54,7 @@ export default function LoginPage() {
       if (user) {
         localStorage.setItem('currentUser', JSON.stringify(user));
       }
+      console.log('Login successful, redirecting...');
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -61,9 +68,13 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl font-['Pacifico']">logo</span>
-            </div>
+            <Image
+              src="/worklytics_logo.png"
+              alt="Worklytics Logo"
+              width={120}
+              height={120}
+              className="object-contain"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome Back

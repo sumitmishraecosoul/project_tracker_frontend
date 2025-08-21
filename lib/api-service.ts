@@ -63,6 +63,7 @@ interface Task {
 
 class ApiService {
   private getAuthHeader() {
+    console.log('getAuthHeader');
     const stored = localStorage.getItem('token') || '';
     const authValue = stored
       ? stored.startsWith('Bearer ') ? stored : `Bearer ${stored}`
@@ -121,6 +122,7 @@ class ApiService {
     password: string;
     role: string;
     department: string;
+    manager?: string;
   }) {
     const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -177,11 +179,29 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // New RBAC helper endpoints
+  async getAssignableUsers() {
+    const response = await fetch(`${API_BASE_URL}/api/users/helpers/assignable-users`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async getMyTeam() {
+    const response = await fetch(`${API_BASE_URL}/api/users/helpers/my-team`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
   // Project APIs
   async getProjects(params?: {
     page?: number;
     limit?: number;
     status?: string;
+    priority?: string;
+    search?: string;
+    department?: string;
   }) {
     const query = new URLSearchParams();
     if (params) {
@@ -198,10 +218,34 @@ class ApiService {
   }
 
   async getProjectById(id: string) {
-    const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
-      headers: this.getAuthHeader()
-    });
-    return this.handleResponse(response);
+    try {
+      const url = `${API_BASE_URL}/api/projects/${id}`;
+      const headers = this.getAuthHeader();
+      
+      console.log('getProjectById - URL:', url);
+      console.log('getProjectById - Headers:', headers);
+      console.log('getProjectById - Authorization header:', headers.Authorization);
+      
+      const response = await fetch(url, {
+        headers: headers
+      });
+      
+      console.log('getProjectById - Response status:', response.status);
+      console.log('getProjectById - Response ok:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('getProjectById - Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const result = await this.handleResponse(response);
+      console.log('getProjectById - Success result:', result);
+      return result;
+    } catch (error) {
+      console.error('getProjectById - Error:', error);
+      throw error;
+    }
   }
 
   async createProject(projectData: {
@@ -212,6 +256,10 @@ class ApiService {
     startDate: string;
     dueDate: string;
     assignedTo?: string[];
+    teamMembers?: Array<{
+      user: string;
+      role: string;
+    }>;
   }) {
     const response = await fetch(`${API_BASE_URL}/api/projects`, {
       method: 'POST',
@@ -221,7 +269,19 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async updateProject(id: string, projectData: any) {
+  async updateProject(id: string, projectData: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    startDate?: string;
+    dueDate?: string;
+    assignedTo?: string[];
+    teamMembers?: Array<{
+      user: string;
+      role: string;
+    }>;
+  }) {
     const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
@@ -485,7 +545,7 @@ class ApiService {
   }
 
   // Task APIs
-  async getTasks(params?: { status?: string; taskType?: string; view?: string; projectId?: string; assignedTo?: string }): Promise<Task[]> {
+  async getTasks(params?: { status?: string; taskType?: string; view?: string; projectId?: string; assignedTo?: string; department?: string }): Promise<Task[]> {
     try {
       const query = new URLSearchParams();
       if (params) {
@@ -709,15 +769,36 @@ class ApiService {
   }
 
   // New Dashboard Summary API - Single call for all dashboard data
-  async getDashboardSummary() {
+  async getDashboardSummary(params?: { department?: string }) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/dashboard/summary`, {
+      const query = new URLSearchParams();
+      if (params?.department) {
+        query.append('department', params.department);
+      }
+      
+      const url = `${API_BASE_URL}/api/dashboard/summary${query.toString() ? `?${query.toString()}` : ''}`;
+        
+      const response = await fetch(url, {
         headers: this.getAuthHeader()
       });
       return await this.handleResponse(response);
     } catch (error) {
       devError('Failed to fetch dashboard summary:', error);
       throw error;
+    }
+  }
+
+  // Get available departments for admin users
+  async getDepartments(): Promise<string[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/dashboard/departments`, {
+        headers: this.getAuthHeader()
+      });
+      const data = await this.handleResponse(response);
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      devError('Failed to fetch departments:', error);
+      return [];
     }
   }
 }

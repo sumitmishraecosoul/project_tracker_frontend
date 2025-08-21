@@ -10,6 +10,7 @@ import EditProjectModal from '../../components/EditProjectModal';
 import TeamMemberManagement from '../../components/TeamMemberManagement';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
+import { DEPARTMENTS } from '../../lib/constants';
 
 interface Project {
   _id: string;
@@ -20,6 +21,14 @@ interface Project {
   priority: 'Low' | 'Medium' | 'High';
   startDate: string;
   dueDate: string;
+  department?: string;
+  activeMembersCount?: number;
+  createdBy?: {
+    _id: string;
+    name: string;
+    email: string;
+    department: string;
+  };
   assignedTo?: Array<{
     _id: string;
     name: string;
@@ -54,7 +63,10 @@ export default function ProjectTracker() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allProjectsList, setAllProjectsList] = useState<Array<{ id: string; title: string }>>([]);
   const [projectDropdown, setProjectDropdown] = useState<string>('All Projects');
-  const [viewMode, setViewMode] = useState<'gantt' | 'list'>('gantt');
+  const [viewMode, setViewMode] = useState<'gantt' | 'list'>('list');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('All Departments');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
   const [allTasks, setAllTasks] = useState<Array<{
     _id: string;
     projectId: string;
@@ -65,20 +77,74 @@ export default function ProjectTracker() {
   }>>([]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [statusFilter]);
+    // Get current user for department filtering
+    const userStr = localStorage.getItem('currentUser');
+    console.log('ProjectTracker - Raw user string from localStorage:', userStr);
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        console.log('ProjectTracker - Parsed user data:', userData);
+        setCurrentUser(userData);
+        
+        // Set default department based on user role
+        if (userData.role === 'admin') {
+          if (userData.department) {
+            setDepartmentFilter(userData.department);
+          } else {
+            setDepartmentFilter('All Departments');
+          }
+        }
+      } catch (parseError) {
+        console.error('ProjectTracker - Error parsing user data:', parseError);
+        setError('Invalid user data. Please log in again.');
+      }
+    } else {
+      console.log('ProjectTracker - No user data found in localStorage');
+    }
+  }, []);
+
+  // Fetch available departments for admin users
+  const fetchDepartments = async () => {
+    try {
+      if (currentUser?.role === 'admin') {
+        const departments = await apiService.getDepartments();
+        setAvailableDepartments(departments);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch projects if currentUser is loaded
+    if (currentUser) {
+      fetchDepartments();
+      fetchProjects();
+      // Reset project dropdown filter when department changes
+      setProjectDropdown('All Projects');
+    }
+  }, [statusFilter, departmentFilter, currentUser]);
 
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const data = await apiService.getProjects();
+        // Prepare parameters for admin department filtering
+        const params: any = {};
+        if (currentUser?.role === 'admin') {
+          // Always send department parameter - backend will handle "All Departments" case
+          params.department = departmentFilter;
+        }
+        
+        const data = await apiService.getProjects(params);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
         const list = (arr || []).map((p: any) => ({ id: p._id || p.id, title: p.title }));
         setAllProjectsList(list);
       } catch {}
     };
-    loadAll();
-  }, []);
+    if (currentUser) {
+      loadAll();
+    }
+  }, [currentUser, departmentFilter]);
 
   // Load all tasks once for Gantt view
   useEffect(() => {
@@ -97,13 +163,35 @@ export default function ProjectTracker() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await apiService.getProjects({
+      console.log('Fetching projects...');
+      console.log('Current user:', currentUser);
+      console.log('Status filter:', statusFilter);
+      console.log('Department filter:', departmentFilter);
+      
+      // Check if current user has required fields
+      if (!currentUser || !currentUser._id || !currentUser.role || !currentUser.department) {
+        console.error('Current user missing required fields:', currentUser);
+        setError('User information is incomplete. Please log in again.');
+        setProjects([]);
+        return;
+      }
+      
+      const params: any = {
         status: statusFilter !== 'All' ? statusFilter : undefined,
-      });
+      };
+      
+      // Add department filter for admin users only
+      if (currentUser?.role === 'admin') {
+        // Always send department parameter - backend will handle "All Departments" case
+        params.department = departmentFilter;
+      }
+      
+      console.log('API params:', params);
+      const response = await apiService.getProjects(params);
       console.log('Projects API response:', response);
       
-      // Handle the new paginated response format
-      if (response && response.projects) {
+      // Handle the new paginated response format with null safety
+      if (response && response.projects && Array.isArray(response.projects)) {
         setProjects(response.projects);
         console.log('Projects set from paginated response:', response.projects);
       } else if (Array.isArray(response)) {
@@ -116,27 +204,42 @@ export default function ProjectTracker() {
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error);
-      setError('Failed to load projects');
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = 'Failed to load projects';
+      if (error instanceof Error) {
+        if (error.message.includes('500')) {
+          errorMessage = 'Server error: Please check if you have proper permissions to view projects';
+        } else if (error.message.includes('401')) {
+          errorMessage = 'Authentication error: Please log in again';
+        } else if (error.message.includes('403')) {
+          errorMessage = 'Access denied: You do not have permission to view these projects';
+        } else {
+          errorMessage = `Failed to load projects: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
       setProjects([]); // Set empty array on error
     }
     setLoading(false);
   };
 
   const visibleProjects = useMemo(() => {
-    // Ensure projects is an array
-    const projectsArray = Array.isArray(projects) ? projects : [];
+    // Ensure projects is an array and filter out null/undefined items
+    const projectsArray = Array.isArray(projects) ? projects.filter(p => p !== null && p !== undefined) : [];
     console.log('visibleProjects - projects array:', projectsArray);
     
     // Apply project dropdown filter first
     let filteredList = projectsArray;
     if (projectDropdown && projectDropdown !== 'All Projects') {
-      filteredList = filteredList.filter(p => (p._id || p.id) === projectDropdown);
+      filteredList = filteredList.filter(p => p && (p._id || p.id) === projectDropdown);
     }
     // Then search
     if (!searchQuery) return filteredList;
     const q = searchQuery.toLowerCase();
     const filtered = filteredList.filter((p) =>
-      [p.title, p.description].some((field) => field?.toLowerCase().includes(q))
+      p && [p.title, p.description].some((field) => field?.toLowerCase().includes(q))
     );
     console.log('visibleProjects - filtered:', filtered);
     return filtered;
@@ -248,14 +351,24 @@ export default function ProjectTracker() {
     startDate: string;
     dueDate: string;
     assignedTo: string[];
+    teamMembers?: Array<{
+      user: string;
+      role: string;
+    }>;
   }) => {
     try {
-      await apiService.createProject(newProjectData);
+      console.log('Creating project with data:', newProjectData);
+      console.log('API Base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+      console.log('Auth token:', localStorage.getItem('token'));
+      
+      const result = await apiService.createProject(newProjectData);
+      console.log('Project created successfully:', result);
+      
       await fetchProjects();
       setIsAddModalOpen(false);
     } catch (error) {
       console.error('Failed to add project:', error);
-      setError('Failed to add project');
+      setError(`Failed to add project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -264,8 +377,7 @@ export default function ProjectTracker() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveProject = async (updatedProject: {
-    _id: string;
+  const handleSaveProject = async (projectId: string, updatedProject: {
     title: string;
     description: string;
     status: 'Active' | 'Completed' | 'On Hold';
@@ -273,9 +385,13 @@ export default function ProjectTracker() {
     startDate: string;
     dueDate: string;
     assignedTo: string[];
+    teamMembers?: Array<{
+      user: string;
+      role: string;
+    }>;
   }) => {
     try {
-      await apiService.updateProject(updatedProject._id, updatedProject);
+      await apiService.updateProject(projectId, updatedProject);
       await fetchProjects();
       setIsEditModalOpen(false);
       setEditingProject(null);
@@ -314,25 +430,36 @@ export default function ProjectTracker() {
 
   const handleTeamUpdate = async () => {
     try {
+      // Add a longer delay to ensure API operations have completed
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Refresh the projects list
       await fetchProjects();
       
-      // If we have a selected project for team management, refresh its data
-      if (selectedProjectForTeam) {
-        console.log('Refreshing selected project data for team management:', selectedProjectForTeam._id);
-        const updatedProject = await apiService.getProjectById(selectedProjectForTeam._id);
-        console.log('Updated project data:', updatedProject);
-        
-        if (updatedProject) {
-          setSelectedProjectForTeam(updatedProject);
-        }
-      }
+      // Refresh the team management modal data
+      await refreshTeamManagementData();
     } catch (error) {
       console.error('Failed to update team data:', error);
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  // Function to refresh team management modal data
+  const refreshTeamManagementData = async () => {
+    if (selectedProjectForTeam) {
+      try {
+        const freshProjectData = await apiService.getProjectById(selectedProjectForTeam._id);
+        if (freshProjectData) {
+          setSelectedProjectForTeam(freshProjectData);
+        }
+      } catch (error) {
+        console.error('Failed to refresh team management data:', error);
+      }
+    }
+  };
+
+  const getPriorityColor = (priority: string | undefined) => {
+    if (!priority) return 'bg-gray-100 text-gray-800';
+    
     switch (priority) {
       case 'High':
         return 'bg-red-100 text-red-800';
@@ -345,6 +472,62 @@ export default function ProjectTracker() {
     }
   };
 
+  // Helper functions for role-based permissions
+  const canEditProject = (project: Project): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can edit any project
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can edit projects from their department
+    if (currentUser.role === 'manager') {
+      return project.department === currentUser.department;
+    }
+    
+    // Employees cannot edit any projects
+    return false;
+  };
+
+  const canDeleteProject = (project: Project): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can delete any project
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can delete projects from their department
+    if (currentUser.role === 'manager') {
+      return project.department === currentUser.department;
+    }
+    
+    // Employees cannot delete any projects
+    return false;
+  };
+
+  const canCreateProject = (): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin and managers can create projects
+    return currentUser.role === 'admin' || currentUser.role === 'manager';
+  };
+
+  // Check if user is properly loaded
+  if (!currentUser || !currentUser._id || !currentUser.role || !currentUser.department) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gray-50">
+          <Header />
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading user information...</p>
+              <p className="text-sm text-gray-500 mt-2">Please wait while we verify your permissions</p>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -355,25 +538,43 @@ export default function ProjectTracker() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Project Tracker</h1>
                 <p className="text-gray-600">Manage and track all your projects</p>
+                {currentUser && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Role: {currentUser.role} • Department: {currentUser.department}
+                  </p>
+                )}
               </div>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
-              >
-                <i className="ri-add-line w-5 h-5"></i>
-                <span>Add New Project</span>
-              </button>
+              {canCreateProject() && (
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
+                >
+                  <i className="ri-add-line w-5 h-5"></i>
+                  <span>Add New Project</span>
+                </button>
+              )}
             </div>
 
             {error && (
               <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+                <div className="flex items-center justify-between">
+                  <span>{error}</span>
+                  <button
+                    onClick={() => {
+                      setError('');
+                      fetchProjects();
+                    }}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Retry
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Filters */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
                   <select
@@ -386,7 +587,22 @@ export default function ProjectTracker() {
                     ))}
                   </select>
                 </div>
-                <div className="md:col-span-1">
+                {currentUser?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                    <select
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                                              <option value="All Departments">All Departments</option>
+                        {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
                   <input
                     type="text"
@@ -396,7 +612,7 @@ export default function ProjectTracker() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
-                <div className="md:col-span-1">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
                   <select
                     value={projectDropdown}
@@ -437,77 +653,91 @@ export default function ProjectTracker() {
                   <h2 className="text-lg font-semibold text-gray-900">All Projects</h2>
                 </div>
                 <div className="p-6">
-                  {loading ? (
-                    <p>Loading projects...</p>
+                  {loading || !currentUser ? (
+                    <p>{!currentUser ? 'Loading user information...' : 'Loading projects...'}</p>
                   ) : (
                     <div className="space-y-4">
                       {Array.isArray(visibleProjects) && visibleProjects.map((project) => (
-                        <div key={project._id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div key={project?._id || project?.id || Math.random()} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between">
-                            <Link href={`/project-tracker/${project._id}`} className="flex-1 cursor-pointer">
+                            <Link href={`/project-tracker/${project?._id}`} className="flex-1 cursor-pointer">
                               <div>
                                 <div className="flex items-center space-x-3 mb-2">
-                                  <h3 className="text-xl font-semibold text-gray-900">{project.title}</h3>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(project.priority)}`}>
-                                    {project.priority}
+                                  <h3 className="text-xl font-semibold text-gray-900">{project?.title}</h3>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(project?.priority)}`}>
+                                    {project?.priority}
                                   </span>
                                 </div>
-                                <p className="text-gray-600 mb-4">{project.description}</p>
+                                <p className="text-gray-600 mb-4">{project?.description}</p>
                                 <div className="flex items-center space-x-6 text-sm text-gray-500">
                                   <div className="flex items-center">
                                     <i className="ri-calendar-line w-4 h-4 mr-2"></i>
-                                    <span>Start: {new Date(project.startDate).toLocaleDateString()}</span>
+                                    <span>Start: {new Date(project?.startDate).toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-center">
                                     <i className="ri-flag-line w-4 h-4 mr-2"></i>
-                                    <span>Due: {new Date(project.dueDate).toLocaleDateString()}</span>
+                                    <span>Due: {new Date(project?.dueDate).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <i className="ri-building-line w-4 h-4 mr-2"></i>
+                                    <span>{project?.department || 'No Department'}</span>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <i className="ri-team-line w-4 h-4 mr-2"></i>
+                                    <span>{project?.activeMembersCount || 0} active members</span>
                                   </div>
                                 </div>
                               </div>
                             </Link>
                             <div className="flex items-center space-x-4 ml-6">
                               <span className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                                project.status === 'Active' 
+                                project?.status === 'Active' 
                                   ? 'bg-green-100 text-green-800'
-                                  : project.status === 'Completed'
+                                  : project?.status === 'Completed'
                                   ? 'bg-blue-100 text-blue-800'
                                   : 'bg-yellow-100 text-yellow-800'
                               }`}>
-                                {project.status}
+                                {project?.status}
                               </span>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleEditProject(project);
-                                }}
-                                className="text-gray-600 hover:text-gray-800 cursor-pointer"
-                                title="Edit Project"
-                              >
-                                <i className="ri-edit-line w-5 h-5"></i>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleTeamManagement(project);
-                                }}
-                                className="text-blue-600 hover:text-blue-800 cursor-pointer"
-                                title="Manage Team"
-                              >
-                                <i className="ri-team-line w-5 h-5"></i>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (project._id) {
-                                    handleDeleteProject(project._id);
-                                  }
-                                }}
-                                className="text-red-600 hover:text-red-800 cursor-pointer"
-                                title="Delete Project"
-                              >
-                                <i className="ri-delete-bin-line w-5 h-5"></i>
-                              </button>
-                              <Link href={`/project-tracker/${project._id}`}>
+                              {canEditProject(project) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleEditProject(project);
+                                  }}
+                                  className="text-gray-600 hover:text-gray-800 cursor-pointer"
+                                  title="Edit Project"
+                                >
+                                  <i className="ri-edit-line w-5 h-5"></i>
+                                </button>
+                              )}
+                              {canEditProject(project) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleTeamManagement(project);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                                  title="Manage Team"
+                                >
+                                  <i className="ri-team-line w-5 h-5"></i>
+                                </button>
+                              )}
+                              {canDeleteProject(project) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (project._id) {
+                                      handleDeleteProject(project._id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-800 cursor-pointer"
+                                  title="Delete Project"
+                                >
+                                  <i className="ri-delete-bin-line w-5 h-5"></i>
+                                </button>
+                              )}
+                              <Link href={`/project-tracker/${project?._id}`}>
                                 <i className="ri-arrow-right-line w-5 h-5 text-gray-400"></i>
                               </Link>
                             </div>
@@ -544,6 +774,7 @@ export default function ProjectTracker() {
 
         {isTeamModalOpen && selectedProjectForTeam && (
           <TeamMemberManagement
+            key={`team-management-${selectedProjectForTeam._id}-${JSON.stringify(selectedProjectForTeam.teamMembers)}`}
             projectId={selectedProjectForTeam._id}
             currentTeamMembers={selectedProjectForTeam.teamMembers || []}
             onTeamUpdate={handleTeamUpdate}

@@ -7,6 +7,7 @@ import AddUserTaskModal from '../../components/AddUserTaskModal';
 import EditTaskModal from '../../components/EditTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
+import { DEPARTMENTS } from '../../lib/constants';
 
 interface Task {
   _id: string;
@@ -21,11 +22,13 @@ interface Task {
     _id: string;
     name: string;
     email: string;
+    department?: string;
   };
   reporter: {
     _id: string;
     name: string;
     email: string;
+    department?: string;
   };
   startDate?: string;
   eta: string;
@@ -50,6 +53,7 @@ interface User {
   email: string;
   role: string;
   department: string;
+  assignable?: boolean;
 }
 
 export default function TaskTracker() {
@@ -61,26 +65,77 @@ export default function TaskTracker() {
   const [projectMap, setProjectMap] = useState<Record<string, string>>({});
   const [projectsList, setProjectsList] = useState<Array<{ id: string; title: string }>>([]);
   const [projectFilter, setProjectFilter] = useState<string>('All Projects');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('All Departments');
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     fetchUsers();
+    // Get current user for role-based permissions
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      
+      // Set default department based on user role
+      if (user.role === 'admin') {
+        if (user.department) {
+          setDepartmentFilter(user.department);
+        } else {
+          setDepartmentFilter('All Departments');
+        }
+      }
+    }
   }, []);
+
+  // Fetch available departments for admin users
+  const fetchDepartments = async () => {
+    try {
+      if (currentUser?.role === 'admin') {
+        const departments = await apiService.getDepartments();
+        setAvailableDepartments(departments);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchDepartments();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchUsers();
+      // Reset project filter when department changes
+      setProjectFilter('All Projects');
+    }
+  }, [currentUser, departmentFilter]);
 
   useEffect(() => {
     if (activeUserId) {
       fetchTasks();
     }
-  }, [activeUserId, activeTaskTab, statusFilter, projectFilter]);
+  }, [activeUserId, activeTaskTab, statusFilter, projectFilter, departmentFilter]);
 
   useEffect(() => {
     const fetchProjectsMap = async () => {
       try {
-        const data = await apiService.getProjects();
+        // Prepare parameters for admin department filtering
+        const params: any = {};
+        if (currentUser?.role === 'admin') {
+          // Always send department parameter - backend will handle "All Departments" case
+          params.department = departmentFilter;
+        }
+        
+        const data = await apiService.getProjects(params);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
         const map: Record<string, string> = {};
         (arr || []).forEach((p: any) => {
@@ -93,22 +148,39 @@ export default function TaskTracker() {
         setProjectsList(list);
       } catch {}
     };
-    fetchProjectsMap();
-  }, []);
+    if (currentUser) {
+      fetchProjectsMap();
+    }
+  }, [currentUser, departmentFilter]);
 
   const fetchUsers = async () => {
     try {
-      const data = await apiService.getUsers();
-      console.log('Raw users data from API:', data);
-      const usersData = Array.isArray(data) ? data : [];
-      console.log('Processed users data:', usersData);
-      console.log('Sample user structure:', usersData[0]);
-      console.log('All users with IDs:', usersData.map(u => ({ id: u.id, _id: u._id, name: u.name, email: u.email })));
-      setUsers(usersData as User[]);
+      // Get current user to determine department-based filtering
+      const currentUserStr = localStorage.getItem('currentUser');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      
+      let usersData: User[] = [];
+      
+      if (currentUser?.role === 'admin') {
+        if (departmentFilter === 'All Departments') {
+          // Admin with "All Departments" - show all users
+          const allUsers = await apiService.getUsers();
+          usersData = Array.isArray(allUsers) ? allUsers : [];
+        } else {
+          // Admin with specific department - filter users by department
+          const allUsers = await apiService.getUsers();
+          usersData = Array.isArray(allUsers) ? allUsers.filter(user => user.department === departmentFilter) : [];
+        }
+        setUsers(usersData as User[]);
+      } else {
+        // Manager/Employee: use my-team endpoint to get same department users
+        const data = await apiService.getMyTeam();
+        usersData = Array.isArray(data) ? data : [];
+        setUsers(usersData as User[]);
+      }
+      
+      // Set first user as active if available
       if (usersData.length > 0 && !activeUserId) {
-        console.log('Setting first user as active:', usersData[0]);
-        console.log('First user ID:', usersData[0].id);
-        console.log('First user _id:', usersData[0]._id);
         if (usersData[0]._id) {
           setActiveUserId(usersData[0]._id);
         }
@@ -129,19 +201,36 @@ export default function TaskTracker() {
     setLoading(true);
     try {
       console.log('Calling apiService.getTasks()...');
-      const typeParam =
-        activeTaskTab === 'All Tasks' ? 'All' :
-        activeTaskTab === 'Daily Tasks' ? 'Daily' :
-        activeTaskTab === 'Weekly Tasks' ? 'Weekly' :
-        activeTaskTab === 'Monthly Tasks' ? 'Monthly' :
-        'Adhoc';
+      
+      // Map task tab to API parameters
+      let taskTypeParam: string | undefined;
+      if (activeTaskTab === 'Adhoc Tasks') {
+        taskTypeParam = 'Adhoc';
+      } else if (activeTaskTab === 'Daily Tasks') {
+        taskTypeParam = 'Daily';
+      } else if (activeTaskTab === 'Weekly Tasks') {
+        taskTypeParam = 'Weekly';
+      } else if (activeTaskTab === 'Monthly Tasks') {
+        taskTypeParam = 'Monthly';
+      }
+      // For 'All Tasks', don't pass taskType parameter
+      
       const projectIdParam = projectFilter && projectFilter !== 'All Projects' ? projectFilter : undefined;
-      const data = await apiService.getTasks({
+      
+      // Add department filter for admin users
+      const params: any = {
         assignedTo: activeUserId,
-        taskType: typeParam,
+        taskType: taskTypeParam,
         status: statusFilter === 'All' ? '' : statusFilter,
         projectId: projectIdParam
-      });
+      };
+      
+      if (currentUser?.role === 'admin') {
+        // Always send department parameter - backend will handle "All Departments" case
+        params.department = departmentFilter;
+      }
+      
+      const data = await apiService.getTasks(params);
       console.log('All tasks fetched from API:', data);
       console.log('Tasks data type:', typeof data);
       console.log('Tasks is array:', Array.isArray(data));
@@ -166,43 +255,27 @@ export default function TaskTracker() {
         console.log('No tasks found in API response');
       }
       
-      // Filter tasks assigned to the active user
-      let userTasks = data.filter((task: any) => {
-        console.log(`Checking task ${task.task || task.title}: assignedTo=`, task.assignedTo);
-        console.log(`Active user:`, activeUser);
-        
-        // Check if task is assigned to the active user
-        if (task.assignedTo) {
-          // New format: assignedTo is a populated user object
-          if (task.assignedTo._id && task.assignedTo._id === activeUserId) {
-            console.log(`Task ${task.task} matches by user ID: ${task.assignedTo._id}`);
-            return true;
-          }
-          
-          // Check by user name
-          if (task.assignedTo.name && activeUser && task.assignedTo.name === activeUser.name) {
-            console.log(`Task ${task.task} matches by user name: ${task.assignedTo.name}`);
-            return true;
-          }
-          
-          // Check by user email
-          if (task.assignedTo.email && activeUser && task.assignedTo.email === activeUser.email) {
-            console.log(`Task ${task.task} matches by user email: ${task.assignedTo.email}`);
-            return true;
-          }
-        }
-        
-        console.log(`Task ${task.task} does not match`);
-        return false;
-      });
+      // Backend now handles RBAC filtering, so we can use the data directly
       // Apply project filter on the client if selected
+      let filteredTasks = data;
       if (projectFilter && projectFilter !== 'All Projects') {
-        userTasks = userTasks.filter((task: any) => task.projectId === projectFilter);
+        filteredTasks = data.filter((task: any) => task.projectId === projectFilter);
       }
       
-      console.log('Tasks filtered for user:', userTasks);
+      // Add client-side filtering by assignedTo as fallback
+      // This ensures only tasks for the selected user are shown
+      filteredTasks = filteredTasks.filter((task: any) => {
+        if (task.assignedTo && typeof task.assignedTo === 'object' && task.assignedTo._id) {
+          return task.assignedTo._id === activeUserId;
+        } else if (task.assignedTo && typeof task.assignedTo === 'string') {
+          return task.assignedTo === activeUserId;
+        }
+        return false;
+      });
+      
+      console.log('Tasks from API (RBAC filtered):', filteredTasks);
       console.log('Active user:', activeUser);
-      setTasks(userTasks as Task[]);
+      setTasks(filteredTasks as Task[]);
     } catch (error) {
       console.error('Failed to fetch tasks:', error);
       setError('Failed to load tasks');
@@ -233,7 +306,61 @@ export default function TaskTracker() {
     }
   };
 
+  // Helper functions for role-based permissions
+  const canEditTask = (task: Task): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can edit any task
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can edit tasks from their department
+    if (currentUser.role === 'manager') {
+      // Manager can edit any task - backend will handle department restrictions
+      return true;
+    }
+    
+    // Employees can edit tasks assigned to them or created by them
+    if (currentUser.role === 'employee') {
+      return task.assignedTo._id === currentUser._id || 
+             task.reporter._id === currentUser._id;
+    }
+    
+    return false;
+  };
+
+  const canDeleteTask = (task: Task): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can delete any task
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can delete tasks from their department
+    if (currentUser.role === 'manager') {
+      // Manager can edit any task - backend will handle department restrictions
+      return true;
+    }
+    
+    // Employees CANNOT delete any tasks
+    if (currentUser.role === 'employee') {
+      return false;
+    }
+    
+    return false;
+  };
+
+  const canCreateTask = (): boolean => {
+    if (!currentUser) return false;
+    
+    // ALL users can create tasks now (admin, manager, employee)
+    // Backend will handle the specific restrictions for each role
+    return true;
+  };
+
   const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+
     try {
       await apiService.deleteTask(taskId);
       await fetchTasks();
@@ -299,9 +426,33 @@ export default function TaskTracker() {
         <Header />
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Task Tracker</h1>
-              <p className="text-gray-600">Manage individual tasks and track progress</p>
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Task Tracker</h1>
+                <p className="text-gray-600">Manage individual tasks and track progress</p>
+                {currentUser && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Role: {currentUser.role} • Department: {currentUser.department}
+                  </p>
+                )}
+                {currentUser?.role === 'admin' && departmentFilter !== 'All Departments' && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                      <i className="ri-filter-line mr-1"></i>
+                      Filtered by: {departmentFilter}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {canCreateTask() && (
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
+                >
+                  <i className="ri-add-line w-5 h-5"></i>
+                  <span>Add New Task</span>
+                </button>
+              )}
             </div>
 
             {error && (
@@ -380,6 +531,21 @@ export default function TaskTracker() {
                         ))}
                       </select>
                     </div>
+                    {currentUser?.role === 'admin' && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1 text-right">Department</label>
+                        <select
+                          value={departmentFilter}
+                          onChange={(e) => setDepartmentFilter(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-md text-sm min-w-[200px]"
+                        >
+                                                  <option value="All Departments">All Departments</option>
+                        {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1 text-right">Status</label>
                       <select
@@ -488,22 +654,26 @@ export default function TaskTracker() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-3">
-                                <button
-                                  onClick={() => handleEditTask(task)}
-                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
-                                  title="Edit Task"
-                                >
-                                  <i className="ri-edit-line w-3 h-3 mr-1"></i>
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTask(task._id)}
-                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 shadow-sm"
-                                  title="Delete Task"
-                                >
-                                  <i className="ri-delete-bin-line w-3 h-3 mr-1"></i>
-                                  Delete
-                                </button>
+                                {canEditTask(task) && (
+                                  <button
+                                    onClick={() => handleEditTask(task)}
+                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
+                                    title="Edit Task"
+                                  >
+                                    <i className="ri-edit-line w-3 h-3 mr-1"></i>
+                                    Edit
+                                  </button>
+                                )}
+                                {canDeleteTask(task) && (
+                                  <button
+                                    onClick={() => handleDeleteTask(task._id)}
+                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 shadow-sm"
+                                    title="Delete Task"
+                                  >
+                                    <i className="ri-delete-bin-line w-3 h-3 mr-1"></i>
+                                    Delete
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

@@ -43,6 +43,7 @@ interface User {
   id?: string;
   name: string;
   email: string;
+  assignable?: boolean;
 }
 
 interface EditTaskModalProps {
@@ -79,10 +80,19 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
 
   const fetchUsers = async () => {
     try {
-      const data = await apiService.getUsers();
+      // Use the new RBAC helper endpoint for assignable users
+      const data = await apiService.getAssignableUsers();
       setUsers(data);
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      console.error('Failed to fetch assignable users:', error);
+      // Fallback to regular users endpoint if helper fails
+      try {
+        const fallbackData = await apiService.getUsers();
+        setUsers(fallbackData);
+      } catch (fallbackError) {
+        console.error('Failed to fetch users (fallback):', fallbackError);
+        setUsers([]);
+      }
     }
   };
 
@@ -218,8 +228,12 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name} ({user.email})
+                    <option 
+                      key={user._id} 
+                      value={user._id}
+                      disabled={user.assignable === false}
+                    >
+                      {user.name} ({user.email}) {user.assignable === false ? '(Not Assignable)' : ''}
                     </option>
                   ))}
                 </select>
@@ -235,8 +249,12 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name} ({user.email})
+                    <option 
+                      key={user._id} 
+                      value={user._id}
+                      disabled={user.assignable === false}
+                    >
+                      {user.name} ({user.email}) {user.assignable === false ? '(Not Assignable)' : ''}
                     </option>
                   ))}
                 </select>

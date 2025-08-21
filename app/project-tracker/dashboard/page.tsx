@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Header from '../../../components/Header';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { apiService } from '../../../lib/api-service';
+import { ROLE_LABELS, DEPARTMENTS } from '../../../lib/constants';
 
 interface DashboardStats {
   activeProjectsCount: number;
@@ -42,6 +43,8 @@ interface Project {
   priority: 'Low' | 'Medium' | 'High';
   startDate: string;
   dueDate: string;
+  department?: string;
+  activeMembersCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,19 +85,86 @@ export default function Dashboard() {
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [taskProgress, setTaskProgress] = useState({ completed: 0, inProgress: 0, total: 0 });
+  const [myTeam, setMyTeam] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [departmentFilter, setDepartmentFilter] = useState<string>('All Departments');
+  const [availableDepartments, setAvailableDepartments] = useState<string[]>([]);
+  const [isTeamExpanded, setIsTeamExpanded] = useState(false);
 
   useEffect(() => {
-    fetchDashboardData();
+    // Get current user for admin department filtering
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      
+      // Set default department based on user role
+      if (user.role === 'admin') {
+        if (user.department) {
+          setDepartmentFilter(user.department);
+        } else {
+          setDepartmentFilter('All Departments');
+        }
+      }
+    }
   }, []);
+
+  // Fetch available departments for admin users
+  const fetchDepartments = async () => {
+    try {
+      if (currentUser?.role === 'admin') {
+        const departments = await apiService.getDepartments();
+        setAvailableDepartments(departments);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchDepartments();
+      fetchDashboardData();
+    }
+  }, [currentUser, departmentFilter]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     setError('');
     try {
-      // Use the new optimized dashboard API
-      const dashboardData: DashboardData = await apiService.getDashboardSummary();
+      // Prepare parameters for admin department filtering
+      const params: any = {};
+      if (currentUser?.role === 'admin') {
+        // Always send department parameter - backend will handle "All Departments" case
+        params.department = departmentFilter;
+      }
+      
+      // Use the new optimized dashboard API with department filtering
+      const dashboardData: DashboardData = await apiService.getDashboardSummary(params);
+      
+             // Fetch team information based on department filter
+       try {
+         let teamData;
+         if (currentUser?.role === 'admin') {
+           if (departmentFilter === 'All Departments') {
+             // For admin with "All Departments", get all users
+             teamData = await apiService.getUsers();
+           } else {
+             // For admin with specific department, get team members from that department
+             const allUsers = await apiService.getUsers();
+             teamData = Array.isArray(allUsers) ? allUsers.filter(user => user.department === departmentFilter) : [];
+           }
+         } else {
+           // For non-admin, use getMyTeam
+           teamData = await apiService.getMyTeam();
+         }
+         setMyTeam(Array.isArray(teamData) ? teamData : []);
+       } catch (teamError) {
+        console.error('Failed to fetch team data:', teamError);
+        setMyTeam([]);
+      }
       
       // Validate the response structure
       if (!dashboardData || typeof dashboardData !== 'object') {
@@ -194,15 +264,46 @@ export default function Dashboard() {
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
                   <p className="text-gray-600">Overview of your projects and tasks</p>
+                  {currentUser && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Role: {currentUser.role} • Department: {currentUser.department}
+                    </p>
+                  )}
+                  {currentUser?.role === 'admin' && departmentFilter !== 'All Departments' && (
+                    <div className="mt-2">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                        <i className="ri-filter-line mr-1"></i>
+                        Filtered by: {departmentFilter}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={fetchDashboardData}
-                  disabled={loading}
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </button>
+                <div className="flex items-center space-x-4">
+                  {/* Department Filter for Admin */}
+                  {currentUser?.role === 'admin' && (
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700">Department:</label>
+                      <select
+                        value={departmentFilter}
+                        onChange={(e) => setDepartmentFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="All Departments">All Departments</option>
+                        {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <button
+                    onClick={fetchDashboardData}
+                    disabled={loading}
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <i className={`ri-refresh-line mr-2 ${loading ? 'animate-spin' : ''}`}></i>
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -263,6 +364,62 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Team Information */}
+            {myTeam.length > 0 && (
+              <div className="mb-8">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        {currentUser?.role === 'admin' && departmentFilter !== 'All Departments' 
+                          ? `${departmentFilter} Team Members` 
+                          : 'My Team'
+                        }
+                      </h2>
+                      {myTeam.length > 5 && (
+                        <button
+                          onClick={() => setIsTeamExpanded(!isTeamExpanded)}
+                          className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          {isTeamExpanded ? (
+                            <>
+                              <i className="ri-arrow-up-s-line mr-1"></i>
+                              Show Less
+                            </>
+                          ) : (
+                            <>
+                              <i className="ri-arrow-down-s-line mr-1"></i>
+                              Show All ({myTeam.length})
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(isTeamExpanded ? myTeam : myTeam.slice(0, 5)).map((member) => (
+                        <div key={member._id} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                              <span className="text-blue-600 font-medium text-sm">
+                                {member.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900">{member.name}</h3>
+                              <p className="text-sm text-gray-600">{member.email}</p>
+                              <p className="text-xs text-gray-500 capitalize">{ROLE_LABELS[member.role as keyof typeof ROLE_LABELS] || member.role} • {member.department}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Recent Projects */}
@@ -281,6 +438,16 @@ export default function Dashboard() {
                             <div className="flex-1">
                               <h3 className="font-medium text-gray-900 mb-1">{project.title}</h3>
                               <p className="text-sm text-gray-600 mb-2">{project.description}</p>
+                              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                <span className="flex items-center">
+                                  <i className="ri-building-line w-3 h-3 mr-1"></i>
+                                  {project.department || 'No Department'}
+                                </span>
+                                <span className="flex items-center">
+                                  <i className="ri-team-line w-3 h-3 mr-1"></i>
+                                  {project.activeMembersCount || 0} active members
+                                </span>
+                              </div>
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
                               {project.status}

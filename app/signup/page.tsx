@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { apiService } from '../../lib/api-service';
+import { DEPARTMENTS, DEFAULT_DEPARTMENT, ROLES, DEFAULT_ROLE, ROLE_LABELS } from '../../lib/constants';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -10,8 +12,9 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: '',
-    department: ''
+    role: DEFAULT_ROLE,
+    department: DEFAULT_DEPARTMENT,
+    manager: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +35,7 @@ export default function SignupPage() {
 
     // Validate form
     if (!formData.name || !formData.email || !formData.password || !formData.role || !formData.department) {
-      setError('Please fill in all fields');
+      setError('Please fill in all required fields');
       setIsLoading(false);
       return;
     }
@@ -55,7 +58,8 @@ export default function SignupPage() {
         email: formData.email,
         password: formData.password,
         role: formData.role,
-        department: formData.department
+        department: formData.department,
+        manager: formData.manager || undefined
       });
       
       // Redirect to login page after successful signup
@@ -67,38 +71,20 @@ export default function SignupPage() {
     setIsLoading(false);
   };
 
-  const departments = [
-    'Engineering',
-    'Design',
-    'Marketing',
-    'Sales',
-    'HR',
-    'Finance',
-    'Operations',
-    'Product'
-  ];
-
-  const roles = [
-    'Full Stack Developer',
-    'Frontend Developer',
-    'Backend Developer',
-    'UI/UX Designer',
-    'Product Manager',
-    'DevOps Engineer',
-    'QA Engineer',
-    'Data Analyst',
-    'Marketing Manager',
-    'Sales Executive'
-  ];
+  // Using constants from lib/constants.ts
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl font-['Pacifico']">logo</span>
-            </div>
+            <Image
+              src="/worklytics_logo.png"
+              alt="Worklytics Logo"
+              width={120}
+              height={120}
+              className="object-contain"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">
             Create Account
@@ -106,6 +92,14 @@ export default function SignupPage() {
           <p className="text-gray-600">
             Join our project management platform
           </p>
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Role System:</strong> Administrator (full access), Manager (team access), Employee (self access)
+            </p>
+            <p className="text-xs text-blue-700 mt-1">
+              <strong>Default:</strong> Employee role with India E-commerce department
+            </p>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
@@ -212,9 +206,9 @@ export default function SignupPage() {
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm appearance-none bg-white cursor-pointer"
                 >
                   <option value="">Select your role</option>
-                  {roles.map((role) => (
+                  {ROLES.map((role) => (
                     <option key={role} value={role}>
-                      {role}
+                      {ROLE_LABELS[role]}
                     </option>
                   ))}
                 </select>
@@ -240,7 +234,7 @@ export default function SignupPage() {
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm appearance-none bg-white cursor-pointer"
                 >
                   <option value="">Select your department</option>
-                  {departments.map((dept) => (
+                  {DEPARTMENTS.map((dept) => (
                     <option key={dept} value={dept}>
                       {dept}
                     </option>
@@ -249,6 +243,29 @@ export default function SignupPage() {
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <i className="ri-arrow-down-s-line text-gray-400"></i>
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="manager" className="block text-sm font-medium text-gray-700 mb-2">
+                Manager (Optional)
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <i className="ri-user-line text-gray-400"></i>
+                </div>
+                <input
+                  id="manager"
+                  name="manager"
+                  type="text"
+                  value={formData.manager}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="Enter manager's user ID (optional)"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Leave empty if you don't have a manager, or enter the user ID of your manager
+                </p>
               </div>
             </div>
 

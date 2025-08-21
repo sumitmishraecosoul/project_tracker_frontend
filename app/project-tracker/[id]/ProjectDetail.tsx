@@ -14,6 +14,7 @@ interface Project {
   description: string;
   status: 'Active' | 'Completed' | 'On Hold';
   priority: 'Low' | 'Medium' | 'High';
+  department?: string;
   createdBy?: {
     _id: string;
     name: string;
@@ -43,11 +44,13 @@ interface Task {
     _id: string;
     name: string;
     email: string;
+    department?: string;
   };
   reporter: {
     _id: string;
     name: string;
     email: string;
+    department?: string;
   };
   startDate?: string;
   eta: string;
@@ -77,9 +80,38 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  console.log('ProjectDetail component rendered with projectId:', projectId);
 
   useEffect(() => {
-    fetchProjectData();
+    console.log('ProjectDetail useEffect triggered with projectId:', projectId);
+    
+    // Check authentication
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('currentUser');
+    console.log('Authentication check - Token exists:', !!token);
+    console.log('Authentication check - User exists:', !!user);
+    
+    if (user) {
+      try {
+        const userData = JSON.parse(user);
+        console.log('Current user data:', userData);
+        console.log('User role:', userData.role);
+        console.log('User ID:', userData._id);
+        console.log('User department:', userData.department);
+        setCurrentUser(userData); // Set the current user state
+      } catch (parseError) {
+        console.error('Error parsing user data:', parseError);
+      }
+    }
+    
+    if (projectId) {
+      fetchProjectData();
+    } else {
+      setError('No project ID provided');
+      setLoading(false);
+    }
   }, [projectId]);
 
   const fetchProjectData = async () => {
@@ -87,69 +119,47 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     setError('');
     try {
       console.log('Fetching project data for ID:', projectId);
+      console.log('Project ID type:', typeof projectId);
+      console.log('Project ID length:', projectId.length);
       
-      // Get project details - this endpoint returns both project and tasks
+      // Validate project ID
+      if (!projectId || projectId.trim() === '') {
+        throw new Error('Invalid project ID');
+      }
+      
+      // Get project details - API returns { project: {...}, tasks: [...] }
       const response = await apiService.getProjectById(projectId);
       console.log('Project API response:', response);
       
-      // Check if response has the expected structure
+      // Handle the expected API response format
       if (response && response.project) {
+        // API returns { project: {...}, tasks: [...] }
         setProject(response.project);
         setTasks(response.tasks || []);
-        console.log('Project data set:', response.project);
-        console.log('Project _id:', response.project._id);
-        console.log('Tasks data set:', response.tasks);
+        console.log('Project set successfully:', response.project);
+        console.log('Tasks set successfully:', response.tasks);
         console.log('Number of tasks:', response.tasks ? response.tasks.length : 0);
-        
-        // If no tasks in the response, try to fetch them separately
-        if (!response.tasks || response.tasks.length === 0) {
-          console.log('No tasks in response, trying to fetch separately...');
-          try {
-            const tasksResponse = await apiService.getProjectTasks(projectId);
-            console.log('Separate tasks response:', tasksResponse);
-             if (Array.isArray(tasksResponse) && tasksResponse.length > 0) {
-               setTasks(tasksResponse as unknown as Task[]);
-              console.log('Tasks set from separate call:', tasksResponse);
-            } else {
-              // Last resort: fetch all tasks and filter
-              console.log('Trying to fetch all tasks and filter...');
-              const allTasks = await apiService.getTasks();
-              console.log('All tasks in database:', allTasks);
-               const projectTasks = allTasks.filter((task: any) => {
-                console.log(`Checking task ${task.task}: projectId=${task.projectId}, projectId=${projectId}`);
-                return task.projectId === projectId || task.projectId === response.project._id;
-              });
-               console.log('Filtered tasks for this project:', projectTasks);
-               if (projectTasks.length > 0) {
-                 setTasks(projectTasks as unknown as Task[]);
-                console.log('Tasks set from filtered results:', projectTasks);
-              }
-            }
-          } catch (separateError) {
-            console.log('Separate tasks fetch failed:', separateError);
-          }
-        }
       } else if (response && response._id) {
-        // Fallback: if response is the project directly
+        // Fallback: if response is the project directly (legacy format)
         setProject(response);
-        console.log('Project set directly:', response);
+        console.log('Project set directly (legacy format):', response);
+        
         // Try to get tasks separately
         try {
           const tasksResponse = await apiService.getProjectTasks(projectId);
           setTasks(Array.isArray(tasksResponse) ? tasksResponse : []);
           console.log('Tasks fetched separately:', tasksResponse);
-          console.log('Number of tasks from separate call:', Array.isArray(tasksResponse) ? tasksResponse.length : 0);
         } catch (tasksError) {
           console.log('Could not fetch tasks separately:', tasksError);
           setTasks([]);
         }
       } else {
-        console.error('Unexpected response format:', response);
-        setError('Invalid project data format');
+        throw new Error('Invalid project response format');
       }
+      
     } catch (error) {
       console.error('Failed to fetch project data:', error);
-      setError('Failed to load project data');
+      setError('Project not found or failed to load project data');
     }
     setLoading(false);
   };
@@ -204,6 +214,86 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
     saveTask();
   };
 
+  // Helper functions for role-based permissions
+  const canEditProject = (): boolean => {
+    if (!currentUser || !project) return false;
+    
+    // Admin can edit any project
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can edit projects from their department
+    if (currentUser.role === 'manager') {
+      return project.department === currentUser.department;
+    }
+    
+    // Employees cannot edit any projects
+    return false;
+  };
+
+  const canDeleteProject = (): boolean => {
+    if (!currentUser || !project) return false;
+    
+    // Admin can delete any project
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can delete projects from their department
+    if (currentUser.role === 'manager') {
+      return project.department === currentUser.department;
+    }
+    
+    // Employees cannot delete any projects
+    return false;
+  };
+
+  const canEditTask = (task: Task): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can edit any task
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can edit tasks from their department
+    if (currentUser.role === 'manager') {
+      // Manager can edit any task - backend will handle department restrictions
+      return true;
+    }
+    
+    // Employees can edit tasks assigned to them or created by them
+    if (currentUser.role === 'employee') {
+      return task.assignedTo._id === currentUser._id || 
+             task.reporter._id === currentUser._id;
+    }
+    
+    return false;
+  };
+
+  const canDeleteTask = (task: Task): boolean => {
+    if (!currentUser) return false;
+    
+    // Admin can delete any task
+    if (currentUser.role === 'admin') return true;
+    
+    // Manager can delete tasks from their department
+    if (currentUser.role === 'manager') {
+      // Manager can delete any task - backend will handle department restrictions
+      return true;
+    }
+    
+    // Employees CANNOT delete any tasks
+    if (currentUser.role === 'employee') {
+      return false;
+    }
+    
+    return false;
+  };
+
+  const canCreateTask = (): boolean => {
+    if (!currentUser) return false;
+    
+    // ALL users can create tasks now (admin, manager, employee)
+    // Backend will handle the specific restrictions for each role
+    return true;
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     if (!taskId) {
       console.error('No task ID provided for deletion');
@@ -253,6 +343,20 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   console.log('Rendering project detail with project:', project);
   console.log('Rendering project detail with tasks:', tasks);
   console.log('Tasks length:', tasks.length);
+  console.log('Current user state:', currentUser);
+  console.log('Can create task:', canCreateTask());
+  
+  // Debug: Check each task's permissions
+  tasks.forEach((task, index) => {
+    console.log(`Task ${index}:`, {
+      taskId: task._id,
+      taskName: task.task,
+      assignedTo: task.assignedTo,
+      reporter: task.reporter,
+      canEdit: canEditTask(task),
+      canDelete: canDeleteTask(task)
+    });
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -265,6 +369,11 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
             </Link>
             <h1 className="text-3xl font-bold text-gray-900 mt-4 mb-2">{project.title}</h1>
             <p className="text-gray-600">{project.description}</p>
+            {currentUser && (
+              <p className="text-sm text-gray-500 mt-1">
+                Role: {currentUser.role} • Department: {currentUser.department}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -316,13 +425,15 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Project Tasks</h2>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer whitespace-nowrap flex items-center"
-                >
-                  <i className="ri-add-line w-4 h-4 mr-2"></i>
-                  Add New Task
-                </button>
+                {canCreateTask() && (
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer whitespace-nowrap flex items-center"
+                  >
+                    <i className="ri-add-line w-4 h-4 mr-2"></i>
+                    Add New Task
+                  </button>
+                )}
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -413,22 +524,26 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-3">
-                          <button
-                            onClick={() => handleEditTask(task)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
-                            title="Edit Task"
-                          >
-                            <i className="ri-edit-line w-3 h-3 mr-1"></i>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTask(task._id)}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 shadow-sm"
-                            title="Delete Task"
-                          >
-                            <i className="ri-delete-bin-line w-3 h-3 mr-1"></i>
-                            Delete
-                          </button>
+                          {canEditTask(task) && (
+                            <button
+                              onClick={() => handleEditTask(task)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
+                              title="Edit Task"
+                            >
+                              <i className="ri-edit-line w-3 h-3 mr-1"></i>
+                              Edit
+                            </button>
+                          )}
+                          {canDeleteTask(task) && (
+                            <button
+                              onClick={() => handleDeleteTask(task._id)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 shadow-sm"
+                              title="Delete Task"
+                            >
+                              <i className="ri-delete-bin-line w-3 h-3 mr-1"></i>
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -448,7 +563,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
       </div>
       {isAddModalOpen && (
         <AddUserTaskModal
-          userId=""
+          projectId={projectId}
           onAdd={(task) => {
             console.log('New task added:', task);
             setIsAddModalOpen(false);

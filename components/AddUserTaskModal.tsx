@@ -14,6 +14,7 @@ interface User {
   id?: string;
   name: string;
   email: string;
+  assignable?: boolean;
 }
 
 interface NewTaskData {
@@ -40,24 +41,26 @@ interface NewTaskData {
 }
 
 interface AddUserTaskModalProps {
-  userId: string;
+  userId?: string;
+  projectId?: string; // Optional project ID for project context
   onAdd: (task: any) => void;
   onClose: () => void;
 }
 
-export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTaskModalProps) {
+export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: AddUserTaskModalProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState('');
   const [newTaskData, setNewTaskData] = useState<NewTaskData>({
-    projectId: '',
+    projectId: projectId || '', // Use projectId if provided
     task: '',
     description: '',
     taskType: 'Daily',
     priority: 'Medium',
     status: 'Yet to Start',
-    assignedTo: '',
+    assignedTo: userId || '', // Use userId if provided
     reporter: '',
     startDate: new Date().toISOString().split('T')[0],
     eta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
@@ -126,10 +129,30 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
 
   const fetchUsers = async () => {
     try {
-      const data = await apiService.getUsers();
-      setUsers(data as User[]);
+      // Get current user to determine department-based filtering
+      const currentUserStr = localStorage.getItem('currentUser');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      
+      let usersData: User[] = [];
+      
+      if (currentUser?.role === 'admin') {
+        // Admin can see all users
+        const data = await apiService.getUsers();
+        usersData = Array.isArray(data) ? data : [];
+      } else if (currentUser?.role === 'manager' || currentUser?.role === 'employee') {
+        // Manager and employee can only see users from their department
+        const data = await apiService.getUsers();
+        usersData = Array.isArray(data) ? data.filter(user => user.department === currentUser.department) : [];
+      } else {
+        // Fallback to assignable users endpoint
+        const data = await apiService.getAssignableUsers();
+        usersData = Array.isArray(data) ? data : [];
+      }
+      
+      setUsers(usersData);
     } catch (error) {
       console.error('Failed to fetch users:', error);
+      setUsers([]);
     }
   };
 
@@ -161,7 +184,7 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
           reporter: newTaskData.reporter,
           eta: newTaskData.eta
         });
-        alert('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and End Date');
+        setError('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and End Date');
         setLoading(false);
         return;
       }
@@ -172,10 +195,17 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
           assignedTo: newTaskData.assignedTo,
           reporter: newTaskData.reporter
         });
-        alert('Please select valid users for Assigned To and Reporter');
+        setError('Please select valid users for Assigned To and Reporter');
         setLoading(false);
         return;
       }
+
+      // Get current user to check role-based restrictions
+      const currentUserStr = localStorage.getItem('currentUser');
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      
+      // Backend now handles all RBAC restrictions, so we don't need frontend validation
+      // The backend will enforce department-based restrictions for employees and managers
       
       // Map the data to match backend expectations
       const taskDataForAPI = {
@@ -216,6 +246,9 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
       const createdTask = await apiService.createTask(taskDataForAPI);
       console.log('Task created successfully:', createdTask);
       
+      // Clear any previous errors
+      setError('');
+      
       // Call the onAdd callback with the created task
       onAdd(createdTask);
       
@@ -229,7 +262,17 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
         stack: error instanceof Error ? error.stack : undefined,
         error: error
       });
-      alert(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Handle specific backend errors
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('getManagerTeamUserIds is not defined')) {
+        setError('Task creation failed due to a backend configuration issue. Please contact your administrator or try again later.');
+      } else if (errorMessage.includes('HTTP 400')) {
+        setError('Task creation failed. Please check that all required fields are filled correctly and try again.');
+      } else {
+        setError(`Failed to create task: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -248,7 +291,28 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
               <i className="ri-close-line w-6 h-6"></i>
             </button>
           </div>
+          {/* Role-based guidance */}
+          <div className="mt-2 text-sm text-gray-600">
+            {currentUser?.role === 'employee' && (
+              <p className="text-blue-600">💡 As an employee, you can create tasks for users in your department</p>
+            )}
+            {currentUser?.role === 'manager' && (
+              <p className="text-blue-600">💡 As a manager, you can assign tasks to your team members</p>
+            )}
+            {currentUser?.role === 'admin' && (
+              <p className="text-blue-600">💡 As an admin, you can assign tasks to anyone</p>
+            )}
+          </div>
         </div>
+        
+        {/* Error display */}
+        {error && (
+          <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+
         
         <form onSubmit={(e) => { e.preventDefault(); handleCreateTask(); }} className="p-6">
           <div className="space-y-6">
@@ -362,8 +426,12 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name} ({user.email})
+                    <option 
+                      key={user._id} 
+                      value={user._id}
+                      disabled={user.assignable === false}
+                    >
+                      {user.name} ({user.email}) {user.assignable === false ? '(Not Assignable)' : ''}
                     </option>
                   ))}
                 </select>
@@ -379,8 +447,12 @@ export default function AddUserTaskModal({ userId, onAdd, onClose }: AddUserTask
                 >
                   <option value="">Select a user</option>
                   {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name} ({user.email})
+                    <option 
+                      key={user._id} 
+                      value={user._id}
+                      disabled={user.assignable === false}
+                    >
+                      {user.name} ({user.email}) {user.assignable === false ? '(Not Assignable)' : ''}
                     </option>
                   ))}
                 </select>
