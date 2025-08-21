@@ -11,7 +11,7 @@ export const config = {
   // Environment detection
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',
-  isStaging: process.env.NODE_ENV === 'staging',
+//   isStaging: process.env.NODE_ENV === 'staging',
   
   // Get current API URL based on environment
   getApiUrl: () => {
