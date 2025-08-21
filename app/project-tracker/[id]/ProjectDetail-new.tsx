@@ -19,6 +19,7 @@ interface Project {
 }
 
   interface Task {
+  _id: string;
   id: string;
   projectId: string;
   task: string;
