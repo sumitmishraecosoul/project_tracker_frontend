@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico } from "next/font/google";
 import "./globals.css";
+import BackendUrlDebug from "../components/BackendUrlDebug";
 
 const pacifico = Pacifico({
   weight: '400',
@@ -35,6 +36,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${pacifico.variable} antialiased`}
       >
         {children}
+        <BackendUrlDebug />
       </body>
     </html>
   );

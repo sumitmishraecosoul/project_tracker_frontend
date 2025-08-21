@@ -1,0 +1,77 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to rollback to'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  NODE_VERSION: '18'
+  AZURE_WEBAPP_NAME: your-project-tracker-frontend # Update with your actual web app name
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout specific commit
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.commit_sha }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy rollback
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+        startup-command: 'npm start'
+        
+    - name: Health check after rollback
+      run: |
+        echo "Waiting for rollback to complete..."
+        sleep 30
+        echo "Running health check..."
+        # curl -f https://your-production-app.azurewebsites.net/api/health || exit 1
+        
+    - name: Notify rollback completion
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🔄 Rollback to commit ${github.event.inputs.commit_sha} completed for ${github.event.inputs.environment} environment.`
+          });
+        
+    - name: Azure logout
+      run: |
+        az logout

@@ -1,0 +1,95 @@
+name: CI/CD Pipeline - Deploy to Azure
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  AZURE_WEBAPP_NAME: your-project-tracker-frontend # Replace with your actual Azure Web App name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+  NODE_ENV: production
+
+jobs:
+  # Build and Test Job
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint
+      
+    - name: Run type checking
+      run: npm run type-check || npx tsc --noEmit
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Run tests (if available)
+      run: npm test --if-present
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-files
+        path: |
+          .next/
+          public/
+          package.json
+          package-lock.json
+          next.config.ts
+          tailwind.config.js
+          postcss.config.mjs
+
+  # Deploy to Azure (only on main branch)
+  deploy-to-azure:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-files
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Install production dependencies
+      run: npm ci --only=production
+      
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+        startup-command: 'npm start'
+        app-settings: |
+          NODE_ENV=production
+          NEXT_PUBLIC_API_URL=https://project-tracker-backend-xi.vercel.app
+        
+    - name: Azure logout
+      run: |
+        az logout

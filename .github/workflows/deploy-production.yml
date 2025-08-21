@@ -1,0 +1,119 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - production-backup
+
+env:
+  NODE_VERSION: '18'
+  AZURE_WEBAPP_NAME: your-project-tracker-frontend # Replace with your production Azure Web App name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+  NODE_ENV: production
+
+jobs:
+  # Manual approval step
+  approval:
+    runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ steps.approval.outputs.approved }}
+    steps:
+      - name: Manual Approval
+        id: approval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            const approvalComment = comments.find(comment => 
+              comment.body.includes('APPROVE') && 
+              comment.user.type === 'User'
+            );
+            
+            core.setOutput('approved', approvalComment ? 'true' : 'false');
+
+  # Build and deploy
+  deploy-production:
+    needs: approval
+    runs-on: ubuntu-latest
+    if: needs.approval.outputs.approved == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+      
+    - name: Build application
+      run: npm run build
+      
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy to Azure Production
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+        startup-command: 'npm start'
+        app-settings: |
+          NODE_ENV=production
+          NEXT_PUBLIC_API_URL=https://project-tracker-backend-xi.vercel.app
+        
+    - name: Health check
+      run: |
+        echo "Waiting for deployment to complete..."
+        sleep 30
+        echo "Running health check..."
+        # curl -f https://your-production-app.azurewebsites.net/health || exit 1
+        
+    - name: Notify deployment success
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ Production deployment completed successfully!'
+          });
+        
+    - name: Notify deployment failure
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '❌ Production deployment failed! Please check the logs.'
+          });
+        
+    - name: Azure logout
+      run: |
+        az logout

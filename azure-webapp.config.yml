@@ -1,0 +1,30 @@
+# Azure Web App Configuration
+# This file configures the Azure Web App for Next.js deployment
+
+# Node.js version
+WEBSITE_NODE_DEFAULT_VERSION: 18.17.0
+
+# Environment variables
+NODE_ENV: production
+NPM_CONFIG_PRODUCTION: false
+NEXT_PUBLIC_API_URL: https://project-tracker-backend-xi.vercel.app
+
+# Build configuration
+SCM_DO_BUILD_DURING_DEPLOYMENT: true
+WEBSITE_RUN_FROM_PACKAGE: 1
+
+# Application settings
+WEBSITES_PORT: 3000
+WEBSITES_CONTAINER_START_TIME_LIMIT: 1800
+
+# Performance settings
+WEBSITE_MOUNT_ENABLED: 1
+WEBSITE_LOCAL_CACHE_OPTION: Always
+WEBSITE_LOCAL_CACHE_SIZEINMB: 1024
+
+# Security settings
+WEBSITE_HTTPLOGGING_RETENTION_DAYS: 7
+WEBSITE_WEBSOCKETS_ENABLED: 0
+
+# Custom startup command
+STARTUP_COMMAND: "npm start"

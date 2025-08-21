@@ -1,18 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { config } from './config';
 
-// Check if we're in development mode
-const isDevelopment = process.env.NODE_ENV === 'development';
+const API_BASE_URL = config.getApiUrl();
 
 // Helper function for development-only logging
 const devLog = (...args: any[]) => {
-  if (isDevelopment) {
+  if (config.features.enableDebugLogging) {
     console.log(...args);
   }
 };
 
 // Helper function for development-only error logging
 const devError = (...args: any[]) => {
-  if (isDevelopment) {
+  if (config.features.enableDebugLogging) {
     console.error(...args);
   }
 };
