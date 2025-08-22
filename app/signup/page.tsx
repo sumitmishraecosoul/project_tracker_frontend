@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { apiService } from '../../lib/api-service';
-import { DEPARTMENTS, DEFAULT_DEPARTMENT, ROLES, DEFAULT_ROLE, ROLE_LABELS } from '../../lib/constants';
+import { DEPARTMENTS, ROLES, ROLE_LABELS } from '../../lib/constants';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -13,8 +13,8 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
     employeeNumber: '',
-    role: DEFAULT_ROLE,
-    department: DEFAULT_DEPARTMENT,
+    role: '',
+    department: '',
     manager: ''
   });
   const [error, setError] = useState('');
@@ -79,8 +79,6 @@ export default function SignupPage() {
     setIsLoading(false);
   };
 
-  // Using constants from lib/constants.ts
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -100,14 +98,6 @@ export default function SignupPage() {
           <p className="text-gray-600">
             Join our project management platform
           </p>
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Role System:</strong> Administrator (full access), Manager (team access), Employee (self access)
-            </p>
-            <p className="text-xs text-blue-700 mt-1">
-              <strong>Default:</strong> Employee role with India E-commerce department
-            </p>
-          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">

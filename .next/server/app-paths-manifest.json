@@ -1,7 +1,7 @@
 {
   "/login/page": "app/login/page.js",
-  "/page": "app/page.js",
-  "/signup/page": "app/signup/page.js",
   "/project-tracker/dashboard/page": "app/project-tracker/dashboard/page.js",
-  "/task-tracker/page": "app/task-tracker/page.js"
+  "/page": "app/page.js",
+  "/task-tracker/page": "app/task-tracker/page.js",
+  "/signup/page": "app/signup/page.js"
 }
