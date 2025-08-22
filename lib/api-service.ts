@@ -119,6 +119,7 @@ class ApiService {
     name: string;
     email: string;
     password: string;
+    employeeNumber: string;
     role: string;
     department: string;
     manager?: string;

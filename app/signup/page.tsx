@@ -12,6 +12,7 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    employeeNumber: '',
     role: DEFAULT_ROLE,
     department: DEFAULT_DEPARTMENT,
     manager: ''
@@ -34,7 +35,7 @@ export default function SignupPage() {
     setError('');
 
     // Validate form
-    if (!formData.name || !formData.email || !formData.password || !formData.role || !formData.department) {
+    if (!formData.name || !formData.email || !formData.password || !formData.employeeNumber || !formData.role || !formData.department) {
       setError('Please fill in all required fields');
       setIsLoading(false);
       return;
@@ -52,11 +53,18 @@ export default function SignupPage() {
       return;
     }
 
+    if (formData.employeeNumber.trim().length < 2) {
+      setError('Employee Number must be at least 2 characters long');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await apiService.register({
         name: formData.name,
         email: formData.email,
         password: formData.password,
+        employeeNumber: formData.employeeNumber.trim(),
         role: formData.role,
         department: formData.department,
         manager: formData.manager || undefined
@@ -112,7 +120,7 @@ export default function SignupPage() {
 
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
+                Full Name *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -126,13 +134,14 @@ export default function SignupPage() {
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Enter your full name"
+                  required
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                Email Address *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -146,13 +155,14 @@ export default function SignupPage() {
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Enter your email"
+                  required
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                Password *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -166,13 +176,15 @@ export default function SignupPage() {
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Create a password"
+                  required
+                  minLength={6}
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
+                Confirm Password *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -186,13 +198,38 @@ export default function SignupPage() {
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   placeholder="Confirm your password"
+                  required
                 />
               </div>
             </div>
 
             <div>
+              <label htmlFor="employeeNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                Employee Number *
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <i className="ri-id-card-line text-gray-400"></i>
+                </div>
+                <input
+                  id="employeeNumber"
+                  name="employeeNumber"
+                  type="text"
+                  value={formData.employeeNumber}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="e.g., EMP-1001, ECOSIND0044"
+                  required
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Enter a unique employee identification number (minimum 2 characters)
+              </p>
+            </div>
+
+            <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Role
+                Role *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -204,6 +241,7 @@ export default function SignupPage() {
                   value={formData.role}
                   onChange={handleChange}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm appearance-none bg-white cursor-pointer"
+                  required
                 >
                   <option value="">Select your role</option>
                   {ROLES.map((role) => (
@@ -220,7 +258,7 @@ export default function SignupPage() {
 
             <div>
               <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-2">
-                Department
+                Department *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -232,6 +270,7 @@ export default function SignupPage() {
                   value={formData.department}
                   onChange={handleChange}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm appearance-none bg-white cursor-pointer"
+                  required
                 >
                   <option value="">Select your department</option>
                   {DEPARTMENTS.map((dept) => (
