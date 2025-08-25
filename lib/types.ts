@@ -35,7 +35,7 @@ export interface Task {
   assignedTo: User;
   reporter: User;
   startDate?: string;
-  eta?: string; // Made optional for recurring tasks
+  eta: string; // Required for non-recurring tasks, not allowed for recurring tasks
   estimatedHours?: number;
   actualHours?: number;
   remark?: string;
@@ -60,7 +60,7 @@ export interface NewTask {
   assignedTo: string;
   reporter: string;
   startDate?: string;
-  eta?: string; // Made optional for recurring tasks
+  eta: string; // Required for non-recurring tasks, not allowed for recurring tasks
   estimatedHours?: number;
   actualHours?: number;
   remark?: string;
