@@ -31,11 +31,11 @@ export interface Task {
   description?: string;
   taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   assignedTo: User;
   reporter: User;
   startDate?: string;
-  eta: string;
+  eta?: string; // Made optional for recurring tasks
   estimatedHours?: number;
   actualHours?: number;
   remark?: string;
@@ -56,11 +56,11 @@ export interface NewTask {
   description?: string;
   taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   assignedTo: string;
   reporter: string;
   startDate?: string;
-  eta: string;
+  eta?: string; // Made optional for recurring tasks
   estimatedHours?: number;
   actualHours?: number;
   remark?: string;

@@ -48,6 +48,20 @@ interface Project {
   }>;
 }
 
+interface PaginatedResponse {
+  projects: Project[];
+  currentPage: number;
+  totalPages: number;
+  totalProjects: number;
+}
+
+interface PaginatedResponse {
+  projects: Project[];
+  currentPage: number;
+  totalPages: number;
+  totalProjects: number;
+}
+
 type StatusFilter = 'All' | 'Active' | 'Completed' | 'On Hold';
 
 export default function ProjectTracker() {
@@ -75,6 +89,12 @@ export default function ProjectTracker() {
     eta: string;
     status: string;
   }>>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     // Get current user for department filtering
@@ -123,28 +143,45 @@ export default function ProjectTracker() {
       // Reset project dropdown filter when department changes
       setProjectDropdown('All Projects');
     }
-  }, [statusFilter, departmentFilter, currentUser]);
+  }, [statusFilter, departmentFilter, currentUser, currentPage, pageSize]);
 
   useEffect(() => {
     const loadAll = async () => {
       try {
-        // Prepare parameters for admin department filtering
-        const params: any = {};
+        // Prepare parameters for ALL projects (no pagination)
+        const params: any = {
+          limit: 1000, // Large limit to get all projects
+          page: 1
+        };
+        
+        // Add status filter if not "All"
+        if (statusFilter !== 'All') {
+          params.status = statusFilter;
+        }
+        
+        // Add department filter for admin users only
         if (currentUser?.role === 'admin') {
           // Always send department parameter - backend will handle "All Departments" case
           params.department = departmentFilter;
         }
         
+        console.log('Loading all projects for dropdown with params:', params);
         const data = await apiService.getProjects(params);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
         const list = (arr || []).map((p: any) => ({ id: p._id || p.id, title: p.title }));
-        setAllProjectsList(list);
-      } catch {}
+        // Sort alphabetically by title
+        const sortedList = list.sort((a: { id: string; title: string }, b: { id: string; title: string }) => a.title.localeCompare(b.title));
+        console.log('All projects for dropdown (sorted):', sortedList);
+        setAllProjectsList(sortedList);
+      } catch (error) {
+        console.error('Failed to load all projects for dropdown:', error);
+        setAllProjectsList([]);
+      }
     };
     if (currentUser) {
       loadAll();
     }
-  }, [currentUser, departmentFilter]);
+  }, [currentUser, departmentFilter, statusFilter]);
 
   // Load all tasks once for Gantt view
   useEffect(() => {
@@ -167,6 +204,8 @@ export default function ProjectTracker() {
       console.log('Current user:', currentUser);
       console.log('Status filter:', statusFilter);
       console.log('Department filter:', departmentFilter);
+      console.log('Current page:', currentPage);
+      console.log('Page size:', pageSize);
       
       // Check if current user has required fields
       if (!currentUser || !currentUser._id || !currentUser.role || !currentUser.department) {
@@ -177,6 +216,8 @@ export default function ProjectTracker() {
       }
       
       const params: any = {
+        page: currentPage,
+        limit: pageSize,
         status: statusFilter !== 'All' ? statusFilter : undefined,
       };
       
@@ -190,17 +231,31 @@ export default function ProjectTracker() {
       const response = await apiService.getProjects(params);
       console.log('Projects API response:', response);
       
-      // Handle the new paginated response format with null safety
+      // Handle the paginated response format
       if (response && response.projects && Array.isArray(response.projects)) {
         setProjects(response.projects);
+        setCurrentPage(response.currentPage || 1);
+        setTotalPages(response.totalPages || 1);
+        setTotalProjects(response.totalProjects || 0);
         console.log('Projects set from paginated response:', response.projects);
+        console.log('Pagination info:', {
+          currentPage: response.currentPage,
+          totalPages: response.totalPages,
+          totalProjects: response.totalProjects
+        });
       } else if (Array.isArray(response)) {
-        // Fallback: if response is directly an array
+        // Fallback: if response is directly an array (backward compatibility)
         setProjects(response);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setTotalProjects(response.length);
         console.log('Projects set from array response:', response);
       } else {
         console.error('Unexpected projects response format:', response);
         setProjects([]);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setTotalProjects(0);
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error);
@@ -221,6 +276,9 @@ export default function ProjectTracker() {
       
       setError(errorMessage);
       setProjects([]); // Set empty array on error
+      setCurrentPage(1);
+      setTotalPages(1);
+      setTotalProjects(0);
     }
     setLoading(false);
   };
@@ -236,14 +294,83 @@ export default function ProjectTracker() {
       filteredList = filteredList.filter(p => p && (p._id || p.id) === projectDropdown);
     }
     // Then search
-    if (!searchQuery) return filteredList;
+    if (!searchQuery) {
+      // Sort alphabetically by title when no search query
+      return filteredList.sort((a: Project, b: Project) => a.title.localeCompare(b.title));
+    }
     const q = searchQuery.toLowerCase();
     const filtered = filteredList.filter((p) =>
       p && [p.title, p.description].some((field) => field?.toLowerCase().includes(q))
     );
     console.log('visibleProjects - filtered:', filtered);
-    return filtered;
+    // Sort alphabetically by title
+    return filtered.sort((a: Project, b: Project) => a.title.localeCompare(b.title));
   }, [projects, searchQuery, projectDropdown]);
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  const generatePaginationButtons = () => {
+    const buttons = [];
+    const maxVisiblePages = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    // Previous button
+    buttons.push(
+      <button
+        key="prev"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+    );
+    
+    // Page numbers
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(
+        <button
+          key={i}
+          onClick={() => handlePageChange(i)}
+          className={`px-3 py-2 text-sm font-medium border-t border-b ${
+            i === currentPage
+              ? 'bg-blue-50 border-blue-500 text-blue-600'
+              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+          }`}
+        >
+          {i}
+        </button>
+      );
+    }
+    
+    // Next button
+    buttons.push(
+      <button
+        key="next"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
+    );
+    
+    return buttons;
+  };
 
   const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthIndex = (dateStr?: string) => {
@@ -291,8 +418,12 @@ export default function ProjectTracker() {
             {/* Rows */}
             <div className="space-y-3">
               {visibleProjects.map((p) => {
-                const pStart = monthIndex(p.startDate as any);
-                const pEnd = Math.max(pStart, monthIndex(p.dueDate as any));
+                // Handle optional project dates
+                const projectStartDate = p.startDate || new Date().toISOString().split('T')[0];
+                const projectDueDate = p.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Default to 30 days from now
+                
+                const pStart = monthIndex(projectStartDate as any);
+                const pEnd = Math.max(pStart, monthIndex(projectDueDate as any));
                 const subTasks = tasksByProject[p._id] || tasksByProject[p.id as any] || [];
                 return (
                   <div key={p._id || p.id} className="border-t border-gray-200 pt-3">
@@ -306,7 +437,7 @@ export default function ProjectTracker() {
                       <div
                         className={`h-3 rounded ${projectBarColor(p.status)}`}
                         style={{ gridColumn: `${pStart + 2} / ${pEnd + 3}` }}
-                        title={`${p.title}: ${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.dueDate).toLocaleDateString()}`}
+                        title={`${p.title}: ${p.startDate ? new Date(p.startDate).toLocaleDateString() : 'No start date'} - ${p.dueDate ? new Date(p.dueDate).toLocaleDateString() : 'No due date'}`}
                       />
                     </div>
                     {/* Task rows */}
@@ -595,10 +726,10 @@ export default function ProjectTracker() {
                       onChange={(e) => setDepartmentFilter(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     >
-                                              <option value="All Departments">All Departments</option>
-                        {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ))}
+                      <option value="All Departments">All Departments</option>
+                      {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -650,7 +781,25 @@ export default function ProjectTracker() {
             ) : (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">All Projects</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900">All Projects</h2>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <label className="text-sm text-gray-600">Show:</label>
+                        <select
+                          value={pageSize}
+                          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                        <span className="text-sm text-gray-600">per page</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-6">
                   {loading || !currentUser ? (
@@ -676,7 +825,7 @@ export default function ProjectTracker() {
                                   </div>
                                   <div className="flex items-center">
                                     <i className="ri-flag-line w-4 h-4 mr-2"></i>
-                                    <span>Due: {new Date(project?.dueDate).toLocaleDateString()}</span>
+                                    <span>Due: {project?.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'Not set'}</span>
                                   </div>
                                   <div className="flex items-center">
                                     <i className="ri-building-line w-4 h-4 mr-2"></i>
@@ -752,6 +901,20 @@ export default function ProjectTracker() {
                     </div>
                   )}
                 </div>
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="px-6 py-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-700">
+                        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalProjects)} of {totalProjects} projects
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        {generatePaginationButtons()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

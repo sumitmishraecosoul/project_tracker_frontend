@@ -210,25 +210,31 @@ export default function AddProjectModal({ onSave, onClose }: AddProjectModalProp
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date (Optional)</label>
                 <input
                   type="date"
                   value={formData.startDate}
                   onChange={(e) => handleInputChange('startDate', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
+                  placeholder="Select start date (optional)"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Start date is optional. Leave empty if no specific start date is needed.
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Due Date (Optional)</label>
                 <input
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => handleInputChange('dueDate', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
+                  placeholder="Select due date (optional)"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Due date is optional. Leave empty if no specific end date is needed.
+                </p>
               </div>
             </div>
 

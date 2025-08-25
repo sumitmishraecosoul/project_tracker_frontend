@@ -17,7 +17,7 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     description: '',
     taskType: 'Daily' as 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc',
     priority: 'Medium' as 'Critical' | 'High' | 'Medium' | 'Low',
-    status: 'Yet to Start' as 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled',
+    status: 'Yet to Start' as 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring',
     assignedTo: '',
     reporter: '',
     startDate: '',
@@ -57,6 +57,18 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     }
   }, [formData.taskType]);
 
+  // Handle recurring task status changes
+  useEffect(() => {
+    if (formData.status === 'Recurring') {
+      // Clear start date and eta for recurring tasks
+      setFormData(prev => ({
+        ...prev,
+        startDate: '',
+        eta: ''
+      }));
+    }
+  }, [formData.status]);
+
   const getCurrentUser = () => {
     const user = localStorage.getItem('currentUser');
     if (user) {
@@ -66,8 +78,14 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
 
   const fetchProjects = async () => {
     try {
-      const data = await apiService.getProjects();
-      console.log('AddTaskModal - Fetched projects data:', data);
+      // Fetch ALL projects for the dropdown (no pagination)
+      const params = {
+        limit: 1000, // Large limit to get all projects
+        page: 1
+      };
+      
+      const data = await apiService.getProjects(params);
+      console.log('AddTaskModal - Fetched all projects data:', data);
       
       // Ensure data is an array - handle different response formats
       let projectsData = [];
@@ -78,11 +96,13 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
       } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
         projectsData = data.data;
       }
-      console.log('AddTaskModal - Processed projects data:', projectsData);
+      console.log('AddTaskModal - Processed all projects data:', projectsData);
       
-      setProjects(projectsData as Project[]);
+      // Sort alphabetically by title
+      const sortedProjects = projectsData.sort((a: Project, b: Project) => a.title.localeCompare(b.title));
+      setProjects(sortedProjects as Project[]);
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error('Failed to fetch all projects:', error);
       setProjects([]); // Set empty array on error
     }
   };
@@ -100,17 +120,24 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
     e.preventDefault();
     setLoading(true);
     
-    const newTask = {
+    // Prepare task data based on status
+    let taskData = {
       ...formData,
       reporter: currentUser?.name || '',
       estimatedHours: formData.estimatedHours || 0,
       actualHours: formData.actualHours || 0
     };
+
+    // For recurring tasks, ensure date fields are not sent
+    if (formData.status === 'Recurring') {
+      const { startDate, eta, ...recurringTaskData } = taskData;
+      taskData = recurringTaskData as any;
+    }
     
-    console.log('Submitting task:', newTask);
+    console.log('Submitting task:', taskData);
     
     try {
-      onSave(newTask);
+      onSave(taskData);
     } catch (error) {
       console.error('Error saving task:', error);
       setLoading(false);
@@ -238,6 +265,7 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
                   <option value="Cancelled">Cancelled</option>
+                  <option value="Recurring">Recurring</option>
                 </select>
               </div>
 
@@ -271,28 +299,42 @@ export default function AddTaskModal({ projectId, onSave, onClose }: AddTaskModa
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => handleInputChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+            {formData.status !== 'Recurring' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
-                <input
-                  type="date"
-                  value={formData.eta}
-                  onChange={(e) => handleInputChange('eta', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
+                  <input
+                    type="date"
+                    value={formData.eta}
+                    onChange={(e) => handleInputChange('eta', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {formData.status === 'Recurring' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <div className="flex items-center">
+                  <i className="ri-information-line text-blue-500 mr-2"></i>
+                  <p className="text-sm text-blue-700">
+                    <strong>Recurring Task:</strong> This task repeats regularly without specific start/end dates. 
+                    Date fields are automatically hidden for recurring tasks.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

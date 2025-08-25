@@ -82,13 +82,19 @@ export default function TaskTracker() {
   useEffect(() => {
     const fetchProjectsMap = async () => {
       try {
-        // Prepare parameters for admin department filtering
-        const params: any = {};
+        // Prepare parameters for ALL projects (no pagination)
+        const params: any = {
+          limit: 1000, // Large limit to get all projects
+          page: 1
+        };
+        
+        // Add department filter for admin users only
         if (currentUser?.role === 'admin') {
           // Always send department parameter - backend will handle "All Departments" case
           params.department = departmentFilter;
         }
         
+        console.log('Loading all projects for task tracker dropdown with params:', params);
         const data = await apiService.getProjects(params);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
         const map: Record<string, string> = {};
@@ -99,8 +105,15 @@ export default function TaskTracker() {
         });
         setProjectMap(map);
         const list = (arr || []).map((p: any) => ({ id: p._id || p.id, title: p.title }));
-        setProjectsList(list);
-      } catch {}
+        // Sort alphabetically by title
+        const sortedList = list.sort((a: { id: string; title: string }, b: { id: string; title: string }) => a.title.localeCompare(b.title));
+        console.log('All projects for task tracker dropdown (sorted):', sortedList);
+        setProjectsList(sortedList);
+      } catch (error) {
+        console.error('Failed to load all projects for task tracker dropdown:', error);
+        setProjectMap({});
+        setProjectsList([]);
+      }
     };
     if (currentUser) {
       fetchProjectsMap();
@@ -576,6 +589,8 @@ export default function TaskTracker() {
                             ? 'bg-orange-100 text-orange-800'
                             : task.status === 'Cancelled'
                             ? 'bg-gray-200 text-gray-800'
+                            : task.status === 'Recurring'
+                            ? 'bg-purple-100 text-purple-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
                                 {task.status}
@@ -601,7 +616,7 @@ export default function TaskTracker() {
                               {task.startDate ? new Date(task.startDate).toLocaleDateString() : 'Not set'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {new Date(task.eta).toLocaleDateString()}
+                              {task.eta ? new Date(task.eta).toLocaleDateString() : 'Not set'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {task.actualHours || 0}/{task.estimatedHours || 0}

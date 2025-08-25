@@ -54,6 +54,18 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
     }
   }, [newTaskData.taskType]);
 
+  // Handle recurring task status changes
+  useEffect(() => {
+    if (newTaskData.status === 'Recurring') {
+      // Clear start date and eta for recurring tasks
+      setNewTaskData(prev => ({
+        ...prev,
+        startDate: '',
+        eta: ''
+      }));
+    }
+  }, [newTaskData.status]);
+
   // Set default reporter when current user is available
   useEffect(() => {
     if (currentUser && currentUser._id && !newTaskData.reporter) {
@@ -70,8 +82,14 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
 
   const fetchProjects = async () => {
     try {
-      const data = await apiService.getProjects();
-      console.log('AddUserTaskModal - Fetched projects data:', data);
+      // Fetch ALL projects for the dropdown (no pagination)
+      const params = {
+        limit: 1000, // Large limit to get all projects
+        page: 1
+      };
+      
+      const data = await apiService.getProjects(params);
+      console.log('AddUserTaskModal - Fetched all projects data:', data);
       
       // Ensure data is an array - handle different response formats
       let projectsData = [];
@@ -82,11 +100,13 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
       } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
         projectsData = data.data;
       }
-      console.log('AddUserTaskModal - Processed projects data:', projectsData);
+      console.log('AddUserTaskModal - Processed all projects data:', projectsData);
       
-      setProjects(projectsData as Project[]);
+      // Sort alphabetically by title
+      const sortedProjects = projectsData.sort((a: Project, b: Project) => a.title.localeCompare(b.title));
+      setProjects(sortedProjects as Project[]);
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error('Failed to fetch all projects:', error);
       setProjects([]); // Set empty array on error
     }
   };
@@ -139,16 +159,26 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
       setLoading(true);
       console.log('Creating new task with data:', newTaskData);
       
-      // Validate required fields
-      if (!newTaskData.projectId || !newTaskData.task || !newTaskData.assignedTo || !newTaskData.reporter || !newTaskData.eta) {
-        console.error('Missing required fields:', {
-          projectId: newTaskData.projectId,
-          task: newTaskData.task,
-          assignedTo: newTaskData.assignedTo,
-          reporter: newTaskData.reporter,
-          eta: newTaskData.eta
-        });
-        setError('Please fill in all required fields: Project, Task Name, Assigned To, Reporter, and End Date');
+      // Validate required fields (eta is not required for recurring tasks)
+      const isRecurring = newTaskData.status === 'Recurring';
+      const requiredFields = {
+        projectId: newTaskData.projectId,
+        task: newTaskData.task,
+        assignedTo: newTaskData.assignedTo,
+        reporter: newTaskData.reporter,
+        eta: isRecurring ? true : newTaskData.eta // eta is not required for recurring tasks
+      };
+      
+      if (!requiredFields.projectId || !requiredFields.task || !requiredFields.assignedTo || !requiredFields.reporter || !requiredFields.eta) {
+        console.error('Missing required fields:', requiredFields);
+        const missingFields = [];
+        if (!requiredFields.projectId) missingFields.push('Project');
+        if (!requiredFields.task) missingFields.push('Task Name');
+        if (!requiredFields.assignedTo) missingFields.push('Assigned To');
+        if (!requiredFields.reporter) missingFields.push('Reporter');
+        if (!requiredFields.eta && !isRecurring) missingFields.push('End Date');
+        
+        setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
         setLoading(false);
         return;
       }
@@ -172,7 +202,7 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
       // The backend will enforce department-based restrictions for employees and managers
       
       // Map the data to match backend expectations
-      const taskDataForAPI = {
+      let taskDataForAPI: any = {
         projectId: newTaskData.projectId,
         task: newTaskData.task,
         description: newTaskData.description || '',
@@ -181,8 +211,6 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
         priority: newTaskData.priority,
         assignedTo: newTaskData.assignedTo,
         reporter: newTaskData.reporter,
-        startDate: newTaskData.startDate,
-        eta: newTaskData.eta,
         estimatedHours: newTaskData.estimatedHours || 0,
         actualHours: newTaskData.actualHours || 0,
         remark: newTaskData.remark || '',
@@ -194,6 +222,12 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
         parentTask: newTaskData.parentTask || '',
         sprint: newTaskData.sprint || ''
       };
+
+      // For recurring tasks, don't include date fields
+      if (!isRecurring) {
+        taskDataForAPI.startDate = newTaskData.startDate;
+        taskDataForAPI.eta = newTaskData.eta;
+      }
       
       console.log('Task data for API:', taskDataForAPI);
       console.log('Users available:', users);
@@ -364,6 +398,7 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
                   <option value="Cancelled">Cancelled</option>
+                  <option value="Recurring">Recurring</option>
                 </select>
               </div>
 
@@ -423,28 +458,42 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={newTaskData.startDate}
-                  onChange={(e) => handleNewTaskInputChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+            {newTaskData.status !== 'Recurring' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={newTaskData.startDate}
+                    onChange={(e) => handleNewTaskInputChange('startDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date *</label>
-                <input
-                  type="date"
-                  value={newTaskData.eta}
-                  onChange={(e) => handleNewTaskInputChange('eta', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date *</label>
+                  <input
+                    type="date"
+                    value={newTaskData.eta}
+                    onChange={(e) => handleNewTaskInputChange('eta', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {newTaskData.status === 'Recurring' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <div className="flex items-center">
+                  <i className="ri-information-line text-blue-500 mr-2"></i>
+                  <p className="text-sm text-blue-700">
+                    <strong>Recurring Task:</strong> This task repeats regularly without specific start/end dates. 
+                    Date fields are automatically hidden for recurring tasks.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

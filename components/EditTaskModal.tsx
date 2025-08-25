@@ -36,6 +36,18 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
     }
   }, [formData.taskType]);
 
+  // Handle recurring task status changes
+  useEffect(() => {
+    if (formData.status === 'Recurring') {
+      // Clear start date and eta for recurring tasks
+      setFormData(prev => ({
+        ...prev,
+        startDate: '',
+        eta: ''
+      }));
+    }
+  }, [formData.status]);
+
   const fetchUsers = async () => {
     try {
       // Use the new RBAC helper endpoint for assignable users
@@ -57,7 +69,17 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    onSave(formData);
+    
+    // Prepare task data based on status
+    let taskData = { ...formData };
+
+    // For recurring tasks, ensure date fields are not sent
+    if (formData.status === 'Recurring') {
+      const { startDate, eta, ...recurringTaskData } = taskData;
+      taskData = recurringTaskData as any;
+    }
+    
+    onSave(taskData);
     setLoading(false);
   };
 
@@ -173,6 +195,7 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
                   <option value="Blocked">Blocked</option>
                   <option value="On Hold">On Hold</option>
                 <option value="Cancelled">Cancelled</option>
+                  <option value="Recurring">Recurring</option>
                 </select>
               </div>
 
@@ -219,28 +242,42 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={formData.startDate || ''}
-                  onChange={(e) => handleInputChange('startDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+            {formData.status !== 'Recurring' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={formData.startDate || ''}
+                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                <input
-                  type="date"
-                  value={formData.eta}
-                  onChange={(e) => handleInputChange('eta', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <input
+                    type="date"
+                    value={formData.eta}
+                    onChange={(e) => handleInputChange('eta', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {formData.status === 'Recurring' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <div className="flex items-center">
+                  <i className="ri-information-line text-blue-500 mr-2"></i>
+                  <p className="text-sm text-blue-700">
+                    <strong>Recurring Task:</strong> This task repeats regularly without specific start/end dates. 
+                    Date fields are automatically hidden for recurring tasks.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

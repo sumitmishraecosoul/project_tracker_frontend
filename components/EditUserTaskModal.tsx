@@ -120,8 +120,14 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
 
   const fetchProjects = async () => {
     try {
-      const data = await apiService.getProjects();
-      console.log('EditUserTaskModal - Fetched projects data:', data);
+      // Fetch ALL projects for the dropdown (no pagination)
+      const params = {
+        limit: 1000, // Large limit to get all projects
+        page: 1
+      };
+      
+      const data = await apiService.getProjects(params);
+      console.log('EditUserTaskModal - Fetched all projects data:', data);
       
       // Ensure data is an array - handle different response formats
       let projectsData = [];
@@ -132,11 +138,13 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
       } else if (data && typeof data === 'object' && Array.isArray(data.data)) {
         projectsData = data.data;
       }
-      console.log('EditUserTaskModal - Processed projects data:', projectsData);
+      console.log('EditUserTaskModal - Processed all projects data:', projectsData);
       
-      setProjects(projectsData as Project[]);
+      // Sort alphabetically by title
+      const sortedProjects = projectsData.sort((a: Project, b: Project) => a.title.localeCompare(b.title));
+      setProjects(sortedProjects as Project[]);
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error('Failed to fetch all projects:', error);
       setProjects([]); // Set empty array on error
     }
   };
@@ -455,6 +463,7 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
                     <option value="Blocked">Blocked</option>
                     <option value="On Hold">On Hold</option>
                     <option value="Cancelled">Cancelled</option>
+                    <option value="Recurring">Recurring</option>
                   </select>
                 </div>
 

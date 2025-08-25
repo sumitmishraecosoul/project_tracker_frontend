@@ -351,11 +351,11 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Start Date</p>
-                  <p className="mt-1 text-gray-900">{new Date(project.startDate).toLocaleDateString()}</p>
+                  <p className="mt-1 text-gray-900">{project.startDate ? new Date(project.startDate).toLocaleDateString() : 'Not set'}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Due Date</p>
-                  <p className="mt-1 text-gray-900">{new Date(project.dueDate).toLocaleDateString()}</p>
+                  <p className="mt-1 text-gray-900">{project.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'Not set'}</p>
                 </div>
               </div>
             </div>
@@ -426,6 +426,8 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                              ? 'bg-orange-100 text-orange-800'
                              : task.status === 'Cancelled'
                              ? 'bg-gray-200 text-gray-800'
+                             : task.status === 'Recurring'
+                             ? 'bg-purple-100 text-purple-800'
                              : 'bg-gray-100 text-gray-800'
                          }`}>
                           {task.status}
@@ -454,7 +456,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
                         {task.startDate ? new Date(task.startDate).toLocaleDateString() : 'Not set'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(task.eta).toLocaleDateString()}
+                        {task.eta ? new Date(task.eta).toLocaleDateString() : 'Not set'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {task.actualHours || 0}/{task.estimatedHours || 0}

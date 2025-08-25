@@ -372,17 +372,23 @@ export default function GanttChart({ projects, tasks }: GanttChartProps) {
                       <span className={`transition-transform ${expanded[pid] ? 'rotate-90' : ''}`}>▶</span>
                       <span className="text-sm font-semibold text-gray-900">{p.title}</span>
                     </button>
-                    <div className="text-xs text-gray-500">{new Date(p.startDate).toLocaleDateString()} – {new Date(p.dueDate).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-500">
+                      {p.startDate ? new Date(p.startDate).toLocaleDateString() : 'No start date'} – {p.dueDate ? new Date(p.dueDate).toLocaleDateString() : 'No due date'}
+                    </div>
                   </div>
                   <div className="relative" style={{ gridColumn: '2 / -1' }}>
                     <div className="gantt-timeline h-6">
                       {(() => {
                         try {
-                          const sIdx = indexFromDate(p.startDate);
-                          const eIdx = indexFromDateEnd(p.dueDate, sIdx);
+                          // Handle optional project dates
+                          const projectStartDate = p.startDate || new Date().toISOString().split('T')[0];
+                          const projectDueDate = p.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Default to 30 days from now
+                          
+                          const sIdx = indexFromDate(projectStartDate);
+                          const eIdx = indexFromDateEnd(projectDueDate, sIdx);
                           const split = clamp(todayIdxForScale, sIdx, eIdx);
-                          const startLabel = new Date(p.startDate).toLocaleDateString();
-                          const endLabel = new Date(p.dueDate).toLocaleDateString();
+                          const startLabel = new Date(projectStartDate).toLocaleDateString();
+                          const endLabel = new Date(projectDueDate).toLocaleDateString();
                           const title = `${p.title}: ${startLabel} – ${endLabel}`;
                           const segs = [] as { left: string; width: string; cls: string; title: string }[];
                           if (split > sIdx) {
@@ -412,7 +418,9 @@ export default function GanttChart({ projects, tasks }: GanttChartProps) {
                 <div className={`mt-3 overflow-hidden transition-all duration-300 ${expanded[pid] ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
                   <div className="space-y-2">
                     {subtasks.map((t) => {
-                      const sIdxRaw = indexFromDate(t.startDate || p.startDate);
+                      // Handle optional project dates for task fallback
+                      const projectStartDate = p.startDate || new Date().toISOString().split('T')[0];
+                      const sIdxRaw = indexFromDate(t.startDate || projectStartDate);
                       const eIdx = indexFromDateEnd(t.eta, sIdxRaw);
                       const sIdx = sIdxRaw;
                       return (
