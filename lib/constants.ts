@@ -13,7 +13,8 @@ export const DEPARTMENTS = [
   'Zonal Sales (India)',
   'Supply Chain & Operation',
   'Zonal Sales',
-  'Digital Marketing'
+  'Digital Marketing',
+  'Thrive'
 ] as const;
 
 // Default department as per backend
