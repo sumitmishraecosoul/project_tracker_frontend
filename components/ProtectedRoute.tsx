@@ -1,35 +1,24 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    console.log('ProtectedRoute: Checking authentication...');
-    const user = localStorage.getItem('currentUser');
-    const token = localStorage.getItem('token');
-    console.log('ProtectedRoute: User exists:', !!user);
-    console.log('ProtectedRoute: Token exists:', !!token);
-    
-    if (user && token) {
-      console.log('ProtectedRoute: User authenticated, setting state...');
-      setIsAuthenticated(true);
-    } else {
-      console.log('ProtectedRoute: No user or token, redirecting to login...');
+    if (!isLoading && !isAuthenticated) {
+      console.log('ProtectedRoute: User not authenticated, redirecting to login...');
       router.push('/login');
-      return;
     }
-    setIsLoading(false);
-  }, [router]);
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
     return (

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico } from "next/font/google";
 import "./globals.css";
 import BackendUrlDebug from "../components/BackendUrlDebug";
+import { BrandProvider } from "../components/BrandContext";
+import { BrandUserProvider } from "../components/BrandUserContext";
+import { ProjectProvider } from "../components/ProjectContext";
+import { TaskProvider } from "../components/TaskContext";
+import { SubtaskProvider } from "../components/SubtaskContext";
+import { AuthProvider } from "../lib/contexts/AuthContext";
 
 const pacifico = Pacifico({
   weight: '400',
@@ -35,8 +41,20 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pacifico.variable} antialiased`}
       >
-        {children}
-        <BackendUrlDebug />
+        <AuthProvider>
+          <BrandProvider>
+            <BrandUserProvider>
+              <ProjectProvider>
+                <TaskProvider>
+                  <SubtaskProvider>
+                    {children}
+                    <BackendUrlDebug />
+                  </SubtaskProvider>
+                </TaskProvider>
+              </ProjectProvider>
+            </BrandUserProvider>
+          </BrandProvider>
+        </AuthProvider>
       </body>
     </html>
   );

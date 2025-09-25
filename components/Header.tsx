@@ -5,11 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { ROLE_LABELS } from '../lib/constants';
+import BrandSwitcher from './BrandSwitcher';
+import BrandManagement from './BrandManagement';
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showBrandManagement, setShowBrandManagement] = useState(false);
   
   useEffect(() => {
     const user = localStorage.getItem('currentUser');
@@ -21,6 +24,7 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');
+    localStorage.removeItem('currentBrand');
     router.push('/login');
   };
   
@@ -72,6 +76,18 @@ export default function Header() {
 
           {/* Right Section */}
           <div className="flex items-center space-x-4">
+            {/* Brand Switcher */}
+            <BrandSwitcher className="hidden md:block" />
+            
+            {/* Brand Management Button */}
+            <button
+              onClick={() => setShowBrandManagement(true)}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-blue-100 hover:text-white hover:bg-white/20 transition-all duration-200 whitespace-nowrap"
+              title="Manage Brands"
+            >
+              <i className="ri-settings-3-line"></i>
+            </button>
+            
             <Link
               href="/"
               className="px-4 py-2 rounded-lg text-sm font-medium text-blue-100 hover:text-white hover:bg-white/20 transition-all duration-200 whitespace-nowrap"
@@ -97,6 +113,15 @@ export default function Header() {
           </div>
         </div>
       </div>
+      
+      {/* Brand Management Modal */}
+      {showBrandManagement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <BrandManagement onClose={() => setShowBrandManagement(false)} />
+          </div>
+        </div>
+      )}
     </header>
   );
 }

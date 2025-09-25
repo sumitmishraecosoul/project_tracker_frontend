@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Header from '../../components/Header';
+import VerticalLayout from '../../components/VerticalLayout';
 import AddUserTaskModal from '../../components/AddUserTaskModal';
 import EditTaskModal from '../../components/EditTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -389,8 +389,7 @@ export default function TaskTracker() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <VerticalLayout>
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8 flex items-center justify-between">
@@ -680,7 +679,7 @@ export default function TaskTracker() {
             }}
           />
         )}
-      </div>
+      </VerticalLayout>
     </ProtectedRoute>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { apiService } from '../../lib/api-service';
+import { useAuth } from '../../lib/contexts/AuthContext';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -36,24 +37,7 @@ export default function LoginPage() {
 
     try {
       console.log('Attempting login with:', { email: formData.email });
-      const data = await apiService.login(formData);
-      console.log('Login response:', data);
-      
-      // Handle various token/user shapes
-      const token = data?.token || data?.accessToken || data?.jwt || data?.data?.token;
-      const user = data?.user || data?.data?.user || data?.profile || data;
-
-      console.log('Extracted token:', token ? 'Present' : 'Missing');
-      console.log('Extracted user:', user);
-
-      if (!token) {
-        throw new Error('Authentication succeeded but no token was returned.');
-      }
-
-      localStorage.setItem('token', token);
-      if (user) {
-        localStorage.setItem('currentUser', JSON.stringify(user));
-      }
+      await login(formData.email, formData.password);
       console.log('Login successful, redirecting...');
       router.push('/');
     } catch (err: any) {
@@ -156,6 +140,15 @@ export default function LoginPage() {
                 className="text-blue-600 hover:text-blue-500 font-medium"
               >
                 Sign up here
+              </button>
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Forgot your password?{' '}
+              <button
+                onClick={() => router.push('/forgot-password')}
+                className="text-blue-600 hover:text-blue-500 font-medium"
+              >
+                Reset it here
               </button>
             </p>
           </div>

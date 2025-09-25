@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Header from '../../../components/Header';
+import VerticalLayout from '../../../components/VerticalLayout';
 import AddUserTaskModal from '../../../components/AddUserTaskModal';
 import EditTaskModal from '../../../components/EditTaskModal';
 import { apiService } from '../../../lib/api-service';
@@ -86,7 +86,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
         
         // Try to get tasks separately
         try {
-          const tasksResponse = await apiService.getProjectTasks(projectId);
+          const tasksResponse = await apiService.getLegacyProjectTasks(projectId);
           setTasks(Array.isArray(tasksResponse) ? tasksResponse : []);
           console.log('Tasks fetched separately:', tasksResponse);
         } catch (tasksError) {
@@ -256,27 +256,25 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <VerticalLayout>
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
             <p className="text-center text-gray-600">Loading project...</p>
           </div>
         </div>
-      </div>
+      </VerticalLayout>
     );
   }
 
   if (!project) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <VerticalLayout>
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
             <p className="text-center text-gray-600">Project not found</p>
           </div>
         </div>
-      </div>
+      </VerticalLayout>
     );
   }
 
@@ -299,8 +297,7 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <VerticalLayout>
       <div className="px-6 py-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
@@ -521,6 +518,6 @@ export default function ProjectDetail({ projectId }: ProjectDetailProps) {
           onClose={() => setIsEditModalOpen(false)}
         />
       )}
-    </div>
+    </VerticalLayout>
   );
 }

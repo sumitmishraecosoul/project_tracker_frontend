@@ -151,7 +151,7 @@
           ]
         },
         {
-          "name": "Login User",
+          "name": "Login User", 
           "request": {
             "method": "POST",
             "header": [
