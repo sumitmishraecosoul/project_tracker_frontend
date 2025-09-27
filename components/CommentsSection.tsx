@@ -6,6 +6,7 @@ import CommentInput from './CommentInput';
 import CommentThread from './CommentThread';
 import ActivityFeed from './ActivityFeed';
 import NotificationCenter from './NotificationCenter';
+import { apiService } from '@/lib/api-service';
 
 const CommentsSection: React.FC<CommentsSectionProps> = ({
   taskId,

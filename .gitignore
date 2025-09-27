@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 /build
+.next/
+node_modules/.cache/
 
 # System files
 .DS_Store

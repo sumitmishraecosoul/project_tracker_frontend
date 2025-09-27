@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiService } from '../lib/api-service';
+import { useBrand } from './BrandContext';
 import { 
   Subtask, 
   CreateSubtaskData, 
@@ -84,6 +85,7 @@ interface SubtaskProviderProps {
 }
 
 export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) => {
+  const { currentBrand } = useBrand();
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtaskTemplates, setSubtaskTemplates] = useState<SubtaskTemplate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,8 +180,26 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getTaskSubtasks(taskId);
-      return response.subtasks || [];
+      // Get brand ID from current brand context
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        throw new Error('Brand ID is required');
+      }
+      const response = await apiService.getTaskSubtasks(brandId, taskId);
+      console.log('SubtaskContext - getTaskSubtasks response:', response);
+      console.log('SubtaskContext - response.subtasks:', response.subtasks);
+      console.log('SubtaskContext - response.data:', response.data);
+      // Try different response structures
+      if (response.subtasks) {
+        return response.subtasks;
+      } else if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      } else if (Array.isArray(response)) {
+        return response;
+      } else {
+        console.log('SubtaskContext - unexpected response structure:', response);
+        return [];
+      }
     } catch (err: any) {
       console.error('Error fetching task subtasks:', err);
       setError(err?.message || err?.toString() || 'Failed to fetch task subtasks');

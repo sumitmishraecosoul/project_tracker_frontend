@@ -7,6 +7,8 @@ import { ROLE_LABELS } from '../lib/constants';
 import BrandProjectModal from './BrandProjectModal';
 import { useBrand } from './BrandContext';
 import { useProjects } from './ProjectContext';
+import { useNotifications } from './NotificationContext';
+import { useInvitations } from './InvitationContext';
 
 interface VerticalNavigationProps {
   isCollapsed: boolean;
@@ -16,6 +18,8 @@ interface VerticalNavigationProps {
 export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNavigationProps) {
   const { currentBrand } = useBrand();
   const { projects, getBrandProjects, isLoading } = useProjects();
+  const { unreadCount } = useNotifications();
+  const { pendingInvitations } = useInvitations();
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -57,6 +61,11 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
       name: 'Inbox', 
       path: '/inbox',
       icon: 'ri-notification-line'
+    },
+    { 
+      name: 'Invitations', 
+      path: '/invitations',
+      icon: 'ri-mail-line'
     }
   ];
 
@@ -145,6 +154,16 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
                 <i className={`${item.icon} text-lg ${isCollapsed ? '' : 'mr-3'} ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'}`}></i>
                 {!isCollapsed && (
                   <span className="font-medium">{item.name}</span>
+                )}
+                {item.name === 'Inbox' && unreadCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+                {item.name === 'Invitations' && pendingInvitations.length > 0 && (
+                  <span className="ml-auto bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {pendingInvitations.length > 99 ? '99+' : pendingInvitations.length}
+                  </span>
                 )}
               </Link>
             );

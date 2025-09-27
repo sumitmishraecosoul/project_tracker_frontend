@@ -94,9 +94,14 @@ class ApiService {
         }
       } catch (parseError) {
         devLog('Failed to parse error response:', parseError);
-        const errorText = await response.text();
-        devLog('Raw error response:', errorText);
-        errorMessage = errorText || 'API request failed';
+        try {
+          const errorText = await response.clone().text();
+          devLog('Raw error response:', errorText);
+          errorMessage = errorText || 'API request failed';
+        } catch (textError) {
+          devLog('Failed to read response text:', textError);
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
       }
       
       // Ensure errorMessage is always a string
@@ -925,6 +930,159 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // Notification Management APIs - Updated to match verified backend structure
+  async getBrandNotifications(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    is_read?: boolean;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications?${queryParams}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async getUserNotifications(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    is_read?: boolean;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/user/me?${queryParams}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async markNotificationAsRead(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}/read`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async markAllNotificationsAsRead(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/read-all`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async deleteNotification(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createNotification(brandId: string, notificationData: {
+    recipient: string;
+    type: string;
+    title: string;
+    message: string;
+    entity_type?: string;
+    entity_id?: string;
+    metadata?: any;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(notificationData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getNotificationDetails(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async updateNotification(brandId: string, notificationId: string, updateData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updateData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // Brand Invitation APIs - Updated to match your backend structure with brand context
+  async getPendingInvitations(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/pending`, {
+      method: 'GET',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  // Get user's pending invitations (for invited users)
+  async getUserPendingInvitations() {
+    const response = await fetch(`${API_BASE_URL}/api/users/invitations`, {
+      method: 'GET',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async acceptInvitation(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}/accept`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async declineInvitation(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}/decline`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async getInvitationDetails(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
   async addUserToBrand(brandId: string, userData: {
     email: string;
     role: string;
@@ -1305,24 +1463,24 @@ class ApiService {
   }
 
   // 2. Create Brand Subtask
-  async createBrandSubtask(subtaskData: {
-    task: string;
+  async createBrandSubtask(brandId: string, subtaskData: {
+    task_id: string;
+    title: string;
     description?: string;
-    parentTaskId?: string;
     assignedTo?: string;
     reporter?: string;
     status?: string;
     priority?: string;
-    eta?: string;
-    order?: number;
+    startDate?: string;
     dueDate?: string;
+    order?: number;
     estimatedHours?: number;
     labels?: string[];
     attachments?: string[];
     relatedSubtasks?: string[];
     sprint?: string;
   }) {
-    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks`, {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks`, {
       method: 'POST',
       headers: this.getAuthHeader(),
       body: JSON.stringify(subtaskData)
@@ -1339,8 +1497,8 @@ class ApiService {
   }
 
   // 4. Update Brand Subtask
-  async updateBrandSubtask(subtaskId: string, subtaskData: {
-    task?: string;
+  async updateBrandSubtask(brandId: string, subtaskId: string, subtaskData: {
+    title?: string;
     description?: string;
     status?: string;
     priority?: string;
@@ -1359,7 +1517,7 @@ class ApiService {
     relatedSubtasks?: string[];
     sprint?: string;
   }) {
-    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks/${subtaskId}`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
       body: JSON.stringify(subtaskData)
@@ -1368,8 +1526,8 @@ class ApiService {
   }
 
   // 5. Delete Brand Subtask
-  async deleteBrandSubtask(subtaskId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}`, {
+  async deleteBrandSubtask(brandId: string, subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks/${subtaskId}`, {
       method: 'DELETE',
       headers: this.getAuthHeader()
     });
@@ -1377,8 +1535,8 @@ class ApiService {
   }
 
   // 6. Get Task Subtasks
-  async getTaskSubtasks(taskId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/subtasks`, {
+  async getTaskSubtasks(brandId: string, taskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/subtasks`, {
       headers: this.getAuthHeader()
     });
     return this.handleResponse(response);
@@ -1604,6 +1762,108 @@ class ApiService {
     const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/filter?${params.toString()}`, {
       headers: this.getAuthHeader()
     });
+    return this.handleResponse(response);
+  }
+
+  // Phase 6: Comments & Activities APIs
+  async getBrandComments(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    entity_type?: string;
+    entity_id?: string;
+    status?: string;
+  }) {
+    let url = `${API_BASE_URL}/api/brands/${brandId}/comments`;
+    
+    if (params?.entity_type && params?.entity_id) {
+      url = `${API_BASE_URL}/api/brands/${brandId}/${params.entity_type}/${params.entity_id}/comments`;
+    }
+    
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+
+    const response = await fetch(`${url}?${queryParams}`, {
+      method: 'GET',
+      headers: this.getAuthHeader()
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async createBrandComment(brandId: string, commentData: {
+    content: string;
+    entity_type: string;
+    entity_id: string;
+    parent_id?: string;
+    mentions?: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/${commentData.entity_type}/${commentData.entity_id}/comments`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        content: commentData.content,
+        mentions: commentData.mentions || [],
+        attachments: [],
+        parent_comment: commentData.parent_id
+      })
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async updateBrandComment(brandId: string, commentId: string, commentData: {
+    content: string;
+    mentions?: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(commentData)
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async deleteBrandComment(brandId: string, commentId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async addCommentReaction(brandId: string, commentId: string, reaction: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}/reactions`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reaction })
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async removeCommentReaction(brandId: string, commentId: string, reaction: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}/reactions`, {
+      method: 'DELETE',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reaction })
+    });
+
     return this.handleResponse(response);
   }
 }

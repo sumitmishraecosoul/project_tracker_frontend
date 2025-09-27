@@ -7,6 +7,8 @@ import { BrandUserProvider } from "../components/BrandUserContext";
 import { ProjectProvider } from "../components/ProjectContext";
 import { TaskProvider } from "../components/TaskContext";
 import { SubtaskProvider } from "../components/SubtaskContext";
+import { NotificationProvider } from "../components/NotificationContext";
+import { InvitationProvider } from "../components/InvitationContext";
 import { AuthProvider } from "../lib/contexts/AuthContext";
 
 const pacifico = Pacifico({
@@ -41,20 +43,24 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pacifico.variable} antialiased`}
       >
-        <AuthProvider>
-          <BrandProvider>
-            <BrandUserProvider>
-              <ProjectProvider>
-                <TaskProvider>
-                  <SubtaskProvider>
-                    {children}
-                    <BackendUrlDebug />
-                  </SubtaskProvider>
-                </TaskProvider>
-              </ProjectProvider>
-            </BrandUserProvider>
-          </BrandProvider>
-        </AuthProvider>
+            <AuthProvider>
+              <BrandProvider>
+                <BrandUserProvider>
+                  <ProjectProvider>
+                    <TaskProvider>
+                      <SubtaskProvider>
+                        <NotificationProvider>
+                          <InvitationProvider>
+                            {children}
+                            <BackendUrlDebug />
+                          </InvitationProvider>
+                        </NotificationProvider>
+                      </SubtaskProvider>
+                    </TaskProvider>
+                  </ProjectProvider>
+                </BrandUserProvider>
+              </BrandProvider>
+            </AuthProvider>
       </body>
     </html>
   );

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import VerticalLayout from '../../../../components/VerticalLayout';
 import { apiService } from '../../../../lib/api-service';
 import { Project, Task, CreateTaskData } from '../../../../lib/types';
-import CommentsSection from '../../../../components/CommentsSection';
+import DynamicCommentsSection from '../../../../components/DynamicCommentsSection';
 import { User } from '../../../../lib/comment-types';
 import { useTasks } from '../../../../components/TaskContext';
 import { useProjects } from '../../../../components/ProjectContext';
@@ -51,7 +51,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectingMode, setSelectingMode] = useState<'start' | 'due'>('due');
@@ -72,6 +72,32 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const [editingTaskStatus, setEditingTaskStatus] = useState('');
   const [editingTaskDueDate, setEditingTaskDueDate] = useState('');
   const [isUpdatingTask, setIsUpdatingTask] = useState(false);
+
+  // Enhanced task and subtask management state
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showDependenciesDropdown, setShowDependenciesDropdown] = useState(false);
+  const [selectedDependencies, setSelectedDependencies] = useState<string[]>([]);
+  const [availableDependencies, setAvailableDependencies] = useState<any[]>([]);
+  const [isLoadingSubtasks, setIsLoadingSubtasks] = useState(false);
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
+  const [isUpdatingSubtask, setIsUpdatingSubtask] = useState(false);
+  const [editingSubtask, setEditingSubtask] = useState<any>(null);
+  
+  // Subtask editing state
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
+  const [editingSubtaskPriority, setEditingSubtaskPriority] = useState('');
+  const [editingSubtaskStatus, setEditingSubtaskStatus] = useState('');
+  const [editingSubtaskAssignee, setEditingSubtaskAssignee] = useState('');
+  const [subtaskPriority, setSubtaskPriority] = useState('Low');
+  const [subtaskStatus, setSubtaskStatus] = useState('Yet to Start');
+  const [subtaskAssignee, setSubtaskAssignee] = useState('');
+  
+  // Brand users state
+  const [brandUsers, setBrandUsers] = useState<any[]>([]);
+  const [loadingBrandUsers, setLoadingBrandUsers] = useState(false);
+  const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
 
   // Mock assignee data
   const mockAssignees = [
@@ -233,9 +259,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
         console.error('Error loading data:', error);
         setError('Failed to load project data');
         // Fallback to mock data
-        setProject(mockProject);
+    setProject(mockProject);
       } finally {
-        setLoading(false);
+    setLoading(false);
       }
     };
 
@@ -335,7 +361,83 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     }));
   };
 
+  // Load brand users
+  const loadBrandUsers = async () => {
+    if (!currentBrand?.id) return;
+    
+    try {
+      setLoadingBrandUsers(true);
+      const response = await apiService.getBrandUsers(currentBrand.id);
+      console.log('Brand users API response:', response);
+      console.log('Brand users API response type:', typeof response);
+      console.log('Brand users API response keys:', Object.keys(response || {}));
+      console.log('Brand users API response.data:', response?.data);
+      console.log('Brand users API response.users:', response?.users);
+      
+      // Handle different response formats
+      let users = [];
+      if (Array.isArray(response)) {
+        users = response;
+      } else if (response && Array.isArray(response.data)) {
+        users = response.data;
+      } else if (response && Array.isArray(response.users)) {
+        users = response.users;
+      }
+      
+      console.log('Processed users array:', users);
+      console.log('First user object:', users[0]);
+      console.log('First user keys:', users[0] ? Object.keys(users[0]) : 'No users');
+      
+      setBrandUsers(users);
+      console.log('Brand users loaded:', users.length);
+    } catch (error) {
+      console.error('Error loading brand users:', error);
+      setBrandUsers([]);
+    } finally {
+      setLoadingBrandUsers(false);
+    }
+  };
+
+  // Email validation function
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Handle assignee selection
+  const handleAssigneeSelect = async (assignee: any, isEmail = false) => {
+    if (!editingTask || !currentBrand) return;
+    
+    try {
+      setIsUpdatingTask(true);
+      
+      if (isEmail && isValidEmail(assignee)) {
+        // Handle email assignment
+        await apiService.assignBrandTask(currentBrand.id, editingTask._id, assignee);
+        setSelectedAssignee({ email: assignee, name: assignee, isEmail: true });
+        setAssigneeSearch(assignee);
+      } else if (assignee._id) {
+        // Handle user assignment
+        await apiService.assignBrandTask(currentBrand.id, editingTask._id, assignee._id);
+        setSelectedAssignee(assignee);
+        setAssigneeSearch(`${assignee.name} (${assignee.email})`);
+      }
+      
+      // Refresh tasks
+      await getProjectTasks(currentBrand.id, projectId);
+      setShowAssigneeDropdown(false);
+      
+    } catch (error) {
+      console.error('Error assigning task:', error);
+    } finally {
+      setIsUpdatingTask(false);
+    }
+  };
+
   const handleTaskSelect = async (task: any) => {
+    console.log('handleTaskSelect called with task:', task);
+    console.log('Current brand:', currentBrand);
+    
     setSelectedTask(task);
     setEditingTask(task);
     setEditingTaskName(task.task || '');
@@ -343,14 +445,56 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     setEditingTaskAssignee(task.assignedTo?.id || task.assignedTo || '');
     setEditingTaskPriority(task.priority || 'Low');
     setEditingTaskStatus(task.status || 'Yet to Start');
+    // Set dates properly
+    if (task.startDate) {
+      setStartDate(new Date(task.startDate));
+    } else {
+      setStartDate(new Date()); // Default to today
+    }
+    
+    if (task.eta || task.dueDate) {
+      setDueDate(new Date(task.eta || task.dueDate));
+    } else {
+      setDueDate(null);
+    }
+    
     setEditingTaskDueDate(task.eta || task.dueDate || '');
     setShowTaskDetails(true);
     
+    // Set selected assignee
+    const assigneeId = task.assignedTo?.id || task.assignedTo;
+    if (assigneeId) {
+      const assignee = brandUsers.find(u => u._id === assigneeId);
+      setSelectedAssignee(assignee);
+      setAssigneeSearch(assignee ? `${assignee.name} (${assignee.email})` : '');
+    } else {
+      setSelectedAssignee(null);
+      setAssigneeSearch('');
+    }
+    
+    console.log('Task details panel should be visible now');
+    
+    // Load brand users if not loaded
+    if (brandUsers.length === 0) {
+      await loadBrandUsers();
+    }
+    
     // Load subtasks for the selected task
     try {
+      console.log('Loading subtasks for task:', task._id);
       await loadTaskSubtasks(task._id);
+      console.log('Subtasks loaded successfully');
     } catch (error) {
       console.error('Error loading subtasks:', error);
+    }
+    
+    // Load available dependencies (other tasks in the project)
+    try {
+      const allTasks = tasks.filter(t => t._id !== task._id);
+      setAvailableDependencies(allTasks);
+      console.log('Available dependencies loaded:', allTasks.length);
+    } catch (error) {
+      console.error('Error loading dependencies:', error);
     }
   };
 
@@ -361,6 +505,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   // Task update functions
   const handleUpdateTask = async (field: string, value: any) => {
     if (!editingTask || !currentBrand || isUpdatingTask) return;
+    
+    console.log('handleUpdateTask called:', { field, value, taskId: editingTask._id, brandId: currentBrand.id });
     
     setIsUpdatingTask(true);
     try {
@@ -376,14 +522,17 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
           setEditingTaskDescription(value);
           break;
         case 'priority':
+          console.log('Updating task priority:', { brandId: currentBrand.id, taskId: editingTask._id, priority: value });
           await updateTaskPriority(currentBrand.id, editingTask._id, value);
           setEditingTaskPriority(value);
           break;
         case 'status':
+          console.log('Updating task status:', { brandId: currentBrand.id, taskId: editingTask._id, status: value });
           await updateTaskStatus(currentBrand.id, editingTask._id, value);
           setEditingTaskStatus(value);
           break;
         case 'assignedTo':
+          console.log('Updating task assignee:', { brandId: currentBrand.id, taskId: editingTask._id, assignedTo: value });
           await assignTask(currentBrand.id, editingTask._id, value);
           setEditingTaskAssignee(value);
           break;
@@ -396,6 +545,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       }
       
       if (Object.keys(updateData).length > 0) {
+        console.log('Updating task with data:', { brandId: currentBrand.id, taskId: editingTask._id, updateData });
         await updateTask(currentBrand.id, editingTask._id, updateData);
       }
       
@@ -406,6 +556,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       const updatedTask = { ...editingTask, ...updateData };
       setSelectedTask(updatedTask);
       setEditingTask(updatedTask);
+      
+      console.log('Task updated successfully:', field, value);
       
     } catch (error) {
       console.error('Error updating task:', error);
@@ -461,9 +613,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
         const result = await createTask(currentBrand.id, taskData);
         console.log('Task created successfully:', result);
         
-        // Reset the input
-        setNewTaskName('');
-        setShowNewTaskInput(false);
+      // Reset the input
+      setNewTaskName('');
+      setShowNewTaskInput(false);
         
         // Refresh tasks to show the new task
         if (currentBrand) {
@@ -535,29 +687,75 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   // Subtask handling functions
   const loadTaskSubtasks = async (taskId: string) => {
     try {
+      console.log('loadTaskSubtasks called for taskId:', taskId);
       const subtasks = await getTaskSubtasks(taskId);
-      setTaskSubtasks(prev => ({
-        ...prev,
-        [taskId]: subtasks
-      }));
+      console.log('loadTaskSubtasks - received subtasks:', subtasks);
+      
+      // Debug: Check the assignedTo field in each subtask
+      subtasks.forEach((subtask: any, index) => {
+        console.log(`=== Subtask ${index + 1} DETAILS ===`);
+        console.log('Full subtask object:', subtask);
+        console.log('assignedTo field:', subtask.assignedTo);
+        console.log('assignedTo type:', typeof subtask.assignedTo);
+        if (subtask.assignedTo && typeof subtask.assignedTo === 'object') {
+          console.log('assignedTo object keys:', Object.keys(subtask.assignedTo));
+          console.log('assignedTo._id:', subtask.assignedTo._id);
+          console.log('assignedTo.name:', subtask.assignedTo.name);
+        }
+        console.log('=== END Subtask DETAILS ===');
+      });
+      
+      setTaskSubtasks(prev => {
+        const updated = {
+          ...prev,
+          [taskId]: subtasks
+        };
+        console.log('loadTaskSubtasks - updated taskSubtasks state:', updated);
+        return updated;
+      });
     } catch (error) {
       console.error('Error loading subtasks:', error);
     }
   };
 
   const handleCreateSubtask = async (taskId: string, subtaskName: string) => {
+    const brandId = currentBrand?.id;
+    if (!subtaskName.trim() || !brandId) {
+      console.error('Missing brand ID or subtask name:', { brandId, subtaskName });
+      return;
+    }
+    
     try {
-      await createSubtask({
-        task: subtaskName,
-        parentTaskId: taskId,
-        status: 'Yet to Start',
-        priority: 'Low'
-      });
+      setIsCreatingSubtask(true);
+      
+      const subtaskData = {
+        task_id: taskId,
+        title: subtaskName.trim(),
+        description: '',
+        assignedTo: subtaskAssignee || editingTask?.assignedTo?._id,
+        reporter: editingTask?.reporter?._id || brandId,
+        status: subtaskStatus,
+        priority: subtaskPriority,
+        startDate: new Date().toISOString(),
+        dueDate: editingTask?.eta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        order: (taskSubtasks[taskId]?.length || 0) + 1
+      };
+      
+      console.log('Creating subtask with data:', { brandId, subtaskData });
+      await apiService.createBrandSubtask(brandId, subtaskData);
       await loadTaskSubtasks(taskId);
+      
+      // Reset form
       setNewSubtaskName('');
+      setSubtaskAssignee('');
+      setSubtaskStatus('Yet to Start');
+      setSubtaskPriority('Low');
       setShowSubtaskInput(prev => ({ ...prev, [taskId]: false }));
+      
     } catch (error) {
       console.error('Error creating subtask:', error);
+    } finally {
+      setIsCreatingSubtask(false);
     }
   };
 
@@ -582,6 +780,242 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       [taskId]: !prev[taskId]
     }));
     setCurrentTaskForSubtask(taskId);
+  };
+
+  // Enhanced subtask management functions
+  const handleSubtaskPriorityChange = async (subtaskId: string, newPriority: string) => {
+    try {
+      await apiService.updateSubtaskPriority(subtaskId, newPriority);
+      const parentTask = Object.keys(taskSubtasks).find(taskId => 
+        taskSubtasks[taskId].some(subtask => subtask._id === subtaskId)
+      );
+      if (parentTask) {
+        await loadTaskSubtasks(parentTask);
+      }
+    } catch (error) {
+      console.error('Error updating subtask priority:', error);
+    }
+  };
+
+  const handleSubtaskAssigneeChange = async (subtaskId: string, newAssignee: string) => {
+    try {
+      if (newAssignee) {
+        await apiService.assignSubtask(subtaskId, newAssignee);
+      } else {
+        await apiService.unassignSubtask(subtaskId);
+      }
+      const parentTask = Object.keys(taskSubtasks).find(taskId => 
+        taskSubtasks[taskId].some(subtask => subtask._id === subtaskId)
+      );
+      if (parentTask) {
+        await loadTaskSubtasks(parentTask);
+      }
+    } catch (error) {
+      console.error('Error updating subtask assignee:', error);
+    }
+  };
+
+  const handleSubtaskComplete = async (subtaskId: string, isComplete: boolean) => {
+    try {
+      if (isComplete) {
+        await apiService.completeSubtask(subtaskId);
+      } else {
+        await apiService.uncompleteSubtask(subtaskId);
+      }
+      const parentTask = Object.keys(taskSubtasks).find(taskId => 
+        taskSubtasks[taskId].some(subtask => subtask._id === subtaskId)
+      );
+      if (parentTask) {
+        await loadTaskSubtasks(parentTask);
+      }
+    } catch (error) {
+      console.error('Error updating subtask completion:', error);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    if (!confirm('Are you sure you want to delete this subtask?')) return;
+    
+    try {
+      setIsUpdatingSubtask(true);
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        console.error('Missing brand ID for deleting subtask');
+        return;
+      }
+      await apiService.deleteBrandSubtask(brandId, subtaskId);
+      const parentTask = Object.keys(taskSubtasks).find(taskId => 
+        taskSubtasks[taskId].some(subtask => subtask._id === subtaskId)
+      );
+      if (parentTask) {
+        await loadTaskSubtasks(parentTask);
+      }
+    } catch (error) {
+      console.error('Error deleting subtask:', error);
+    } finally {
+      setIsUpdatingSubtask(false);
+    }
+  };
+
+  // New handlers for subtask editing
+  const handleEditSubtask = (subtask: any) => {
+    console.log('=== handleEditSubtask START ===');
+    console.log('handleEditSubtask called with subtask:', subtask);
+    console.log('brandUsers array:', brandUsers);
+    console.log('brandUsers length:', Array.isArray(brandUsers) ? brandUsers.length : 'Not an array');
+    
+    setEditingSubtaskId(subtask._id);
+    setEditingSubtaskTitle(subtask.title || subtask.task || '');
+    setEditingSubtaskPriority(subtask.priority || 'Low');
+    setEditingSubtaskStatus(subtask.status || 'Yet to Start');
+    
+    // Handle assignedTo as both object and string
+    const assigneeId = subtask.assignedTo ? 
+      (typeof subtask.assignedTo === 'object' ? subtask.assignedTo._id : subtask.assignedTo) : '';
+    setEditingSubtaskAssignee(assigneeId);
+    
+    console.log('Edit form initialized with:', {
+      title: subtask.title || subtask.task || '',
+      priority: subtask.priority || 'Low',
+      status: subtask.status || 'Yet to Start',
+      assigneeId,
+      originalAssignedTo: subtask.assignedTo
+    });
+    
+      // Debug: Check if assigneeId matches any user in brandUsers
+      if (assigneeId) {
+        const matchingUser = Array.isArray(brandUsers) ? brandUsers.find(u => u._id === assigneeId || u.id === assigneeId) : null;
+        console.log('Matching user for assigneeId:', matchingUser);
+      }
+    console.log('=== handleEditSubtask END ===');
+  };
+
+  const handleSaveSubtaskEdit = async (subtaskId: string) => {
+    console.log('=== handleSaveSubtaskEdit START ===');
+    console.log('subtaskId:', subtaskId);
+    console.log('editingSubtaskTitle:', editingSubtaskTitle);
+    console.log('editingSubtaskAssignee:', editingSubtaskAssignee);
+    console.log('editingSubtaskPriority:', editingSubtaskPriority);
+    console.log('editingSubtaskStatus:', editingSubtaskStatus);
+    
+    try {
+      setIsUpdatingSubtask(true);
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        console.error('Missing brand ID');
+        return;
+      }
+
+      // Validate assignedTo - must be a valid ObjectId or empty
+      let validAssignedTo = undefined;
+      if (editingSubtaskAssignee && editingSubtaskAssignee.trim() !== '') {
+        // Check if it's a valid ObjectId (24 character hex string)
+        if (/^[0-9a-fA-F]{24}$/.test(editingSubtaskAssignee.trim())) {
+          validAssignedTo = editingSubtaskAssignee.trim();
+        } else {
+          console.error('Invalid assignedTo value - not a valid ObjectId:', editingSubtaskAssignee);
+          console.log('brandUsers array:', brandUsers);
+          console.log('brandUsers length:', Array.isArray(brandUsers) ? brandUsers.length : 'Not an array');
+          
+          // Try to find the user by name and get their ID
+          const userByName = Array.isArray(brandUsers) ? brandUsers.find(u => u.name === editingSubtaskAssignee) : null;
+          console.log('userByName search result:', userByName);
+          console.log('userByName keys:', userByName ? Object.keys(userByName) : 'No user found');
+          
+          if (userByName) {
+            // Try different possible ID field names
+            const userId = userByName._id || userByName.id || userByName.userId;
+            validAssignedTo = userId;
+            console.log('Found user by name, using ObjectId:', validAssignedTo);
+            console.log('Available ID fields:', {
+              _id: userByName._id,
+              id: userByName.id,
+              userId: userByName.userId
+            });
+          } else {
+            console.error('Could not find user by name:', editingSubtaskAssignee);
+            console.log('Available users:', Array.isArray(brandUsers) ? brandUsers.map(u => ({ 
+              name: u.name, 
+              _id: u._id,
+              id: u.id,
+              userId: u.userId,
+              keys: Object.keys(u)
+            })) : 'Not an array');
+            // Skip the assignedTo update if invalid
+          }
+        }
+      }
+
+      const updateData = {
+        title: editingSubtaskTitle.trim(),
+        priority: editingSubtaskPriority,
+        status: editingSubtaskStatus,
+        assignedTo: validAssignedTo
+      };
+
+      console.log('Update data before sending:', updateData);
+      console.log('editingSubtaskAssignee value:', editingSubtaskAssignee);
+      console.log('validAssignedTo value:', validAssignedTo);
+
+      console.log('Updating subtask with data:', { subtaskId, brandId, updateData });
+      const response = await apiService.updateBrandSubtask(brandId, subtaskId, updateData);
+      console.log('Update response:', response);
+      
+      // Reload subtasks
+      const parentTask = Object.keys(taskSubtasks).find(taskId => 
+        taskSubtasks[taskId].some(subtask => subtask._id === subtaskId)
+      );
+      if (parentTask) {
+        console.log('Reloading subtasks for parent task:', parentTask);
+        await loadTaskSubtasks(parentTask);
+        console.log('Subtasks reloaded successfully');
+      }
+
+      // Reset editing state
+      setEditingSubtaskId(null);
+      setEditingSubtaskTitle('');
+      setEditingSubtaskPriority('');
+      setEditingSubtaskStatus('');
+      setEditingSubtaskAssignee('');
+
+      console.log('=== handleSaveSubtaskEdit SUCCESS ===');
+      console.log('Subtask updated successfully');
+    } catch (error) {
+      console.error('=== handleSaveSubtaskEdit ERROR ===');
+      console.error('Error updating subtask:', error);
+    } finally {
+      setIsUpdatingSubtask(false);
+      console.log('=== handleSaveSubtaskEdit END ===');
+    }
+  };
+
+  const handleCancelSubtaskEdit = () => {
+    setEditingSubtaskId(null);
+    setEditingSubtaskTitle('');
+    setEditingSubtaskPriority('');
+    setEditingSubtaskStatus('');
+    setEditingSubtaskAssignee('');
+  };
+
+
+  const getSubtaskProgress = (taskId: string) => {
+    const subtasks = taskSubtasks[taskId] || [];
+    if (subtasks.length === 0) return 0;
+    
+    const completedSubtasks = subtasks.filter(subtask => subtask.status === 'Completed').length;
+    return Math.round((completedSubtasks / subtasks.length) * 100);
+  };
+
+  const getTaskStatusFromSubtasks = (taskId: string) => {
+    const subtasks = taskSubtasks[taskId] || [];
+    if (subtasks.length === 0) return 'Yet to Start';
+    
+    const completedCount = subtasks.filter(subtask => subtask.status === 'Completed').length;
+    const inProgressCount = subtasks.filter(subtask => subtask.status === 'In Progress').length;
+    
+    if (completedCount === subtasks.length) return 'Completed';
+    if (inProgressCount > 0 || completedCount > 0) return 'In Progress';
+    return 'Yet to Start';
   };
 
   // Date picker helper functions
@@ -628,16 +1062,15 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     console.log('Date selected:', newDate, 'Mode:', selectingMode);
     
-    if (selectingMode === 'start') {
-      setStartDate(newDate);
-      console.log('Start date set:', newDate);
-      // After setting start date, switch to due date mode if due date is not set
-      if (!dueDate) {
-        setSelectingMode('due');
-      }
-    } else {
+    if (selectingMode === 'due') {
       setDueDate(newDate);
       console.log('Due date set:', newDate);
+      // Save the due date to the task
+      if (editingTask && currentBrand) {
+        handleUpdateTask('eta', newDate.toISOString());
+      }
+      // Close the date picker after selecting due date
+      setShowDatePicker(false);
     }
   };
 
@@ -1137,7 +1570,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                         </button>
                                       </div>
                                       <div className="col-span-4">
-                                        <span className="text-sm text-gray-700">{subtask.task}</span>
+                                        <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
                                       </div>
                                       <div className="col-span-2">
                                         <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
@@ -1189,8 +1622,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                               onClick={handleAddTask}
                               className="px-6 py-3 text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
                             >
-                              Add task...
-                            </div>
+                          Add task...
+                        </div>
                           ) : (
                             (tasks || []).filter(task => task.status === 'In Progress' && (!currentBrand || task.brand_id === currentBrand.id)).map((task) => (
                               <div key={task._id} className="px-6 py-3 border-b border-gray-100 hover:bg-gray-50">
@@ -1261,8 +1694,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                               onClick={handleAddTask}
                               className="px-6 py-3 text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
                             >
-                              Add task...
-                            </div>
+                          Add task...
+                        </div>
                           ) : (
                             (tasks || []).filter(task => task.status === 'Completed' && (!currentBrand || task.brand_id === currentBrand.id)).map((task) => (
                               <div key={task._id} className="px-6 py-3 border-b border-gray-100 hover:bg-gray-50">
@@ -1321,13 +1754,16 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
             </div>
 
             {/* Task Details Panel */}
-            {showTaskDetails && selectedTask && (
+            {showTaskDetails && selectedTask && (() => {
+              console.log('Rendering task details panel for:', selectedTask.task);
+              return true;
+            })() && (
               <div className="w-1/3 bg-gray-50 border-l border-gray-200 flex flex-col">
                 {/* Task Details Header */}
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <h3 className="text-lg font-semibold text-gray-900">Task Details</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Task Details</h3>
                       {isUpdatingTask && (
                         <i className="ri-loader-4-line animate-spin text-blue-600"></i>
                       )}
@@ -1369,6 +1805,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
                 {/* Task Details Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
+
                   {/* Task Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Task Name</label>
@@ -1377,13 +1814,13 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                       value={editingTaskName}
                       onChange={(e) => setEditingTaskName(e.target.value)}
                       onBlur={() => {
-                        if (editingTaskName !== selectedTask.task) {
-                          handleUpdateTask('task', editingTaskName);
+                        if (editingTaskName !== selectedTask.task && editingTaskName.trim()) {
+                          handleUpdateTask('task', editingTaskName.trim());
                         }
                       }}
                       onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleUpdateTask('task', editingTaskName);
+                        if (e.key === 'Enter' && editingTaskName.trim()) {
+                          handleUpdateTask('task', editingTaskName.trim());
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1392,7 +1829,100 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     />
                   </div>
 
-                  {/* Task Description */}
+                  {/* Project Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
+                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
+                      {project?.title || 'Loading project...'}
+                    </div>
+                  </div>
+
+
+                  {/* Assignee */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Assignee</label>
+                    <div className="relative assignee-dropdown">
+                      <input
+                        type="text"
+                        placeholder="Name or email"
+                        value={assigneeSearch}
+                        onChange={(e) => {
+                          setAssigneeSearch(e.target.value);
+                          setShowAssigneeDropdown(true);
+                        }}
+                        onFocus={() => setShowAssigneeDropdown(true)}
+                        onBlur={() => {
+                          // Delay hiding to allow clicks
+                          setTimeout(() => setShowAssigneeDropdown(false), 200);
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        disabled={isUpdatingTask}
+                      />
+                      
+                      {showAssigneeDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+                          <div className="p-2">
+                            {/* Brand Users */}
+                            {Array.isArray(brandUsers) && brandUsers
+                              .filter(user => 
+                                user.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+                                user.email.toLowerCase().includes(assigneeSearch.toLowerCase())
+                              )
+                              .map((user) => (
+                                <div 
+                                  key={user._id}
+                                  onClick={() => handleAssigneeSelect(user)}
+                                  className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                >
+                                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <span className="text-white font-medium text-sm">
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                    <div className="text-xs text-gray-500">{user.email}</div>
+                                  </div>
+                                  <div className="text-xs text-gray-400">Brand User</div>
+                                </div>
+                              ))}
+                            
+                            {/* Email Option */}
+                            {assigneeSearch && isValidEmail(assigneeSearch) && (
+                              <div 
+                                onClick={() => handleAssigneeSelect(assigneeSearch, true)}
+                                className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer border-t border-gray-200"
+                              >
+                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                  <i className="ri-mail-line text-white text-sm"></i>
+                          </div>
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium text-gray-900">{assigneeSearch}</div>
+                                  <div className="text-xs text-gray-500">Invite via email</div>
+                          </div>
+                                <div className="text-xs text-green-600">New User</div>
+                        </div>
+                      )}
+                            
+                            {Array.isArray(brandUsers) && brandUsers.length === 0 && !loadingBrandUsers && (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                No brand users found
+                              </div>
+                            )}
+                            
+                            {loadingBrandUsers && (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                <i className="ri-loader-4-line animate-spin mr-2"></i>
+                                Loading users...
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                     <textarea
@@ -1403,95 +1933,49 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                           handleUpdateTask('description', editingTaskDescription);
                         }
                       }}
-                      rows={3}
+                      rows={4}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Add a description..."
                       disabled={isUpdatingTask}
                     />
                   </div>
 
-                  {/* Assignee */}
+                  {/* Start Date */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Assignee</label>
-                    <div className="relative assignee-dropdown">
-                      <input
-                        type="text"
-                        placeholder="Name or email"
-                        value={assigneeSearch}
-                        onChange={(e) => setAssigneeSearch(e.target.value)}
-                        onFocus={() => setShowAssigneeDropdown(true)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        disabled={isUpdatingTask}
-                      />
-                      
-                      {showAssigneeDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                          <div className="p-2">
-                            {mockAssignees
-                              .filter(assignee => 
-                                assignee.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
-                                assignee.email.toLowerCase().includes(assigneeSearch.toLowerCase())
-                              )
-                              .map((assignee) => (
-                                <div 
-                                  key={assignee.id}
-                                  onClick={() => {
-                                    setEditingTaskAssignee(assignee.id);
-                                    setAssigneeSearch(assignee.name);
-                                    setShowAssigneeDropdown(false);
-                                    handleUpdateTask('assignedTo', assignee.id);
-                                  }}
-                                  className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                                >
-                                  <div className={`w-8 h-8 bg-${assignee.color}-500 rounded-full flex items-center justify-center`}>
-                                    <span className="text-white font-medium text-sm">{assignee.avatar}</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="text-sm font-medium text-gray-900">{assignee.name}</div>
-                                    <div className="text-xs text-gray-500">{assignee.email}</div>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                          <div className="border-t border-gray-200 p-2">
-                            <button className="w-full text-left text-sm text-blue-600 hover:text-blue-800 py-1">
-                              Invite teammates via email
-                            </button>
-                            <button className="w-full text-left text-sm text-blue-600 hover:text-blue-800 py-1">
-                              Assign to multiple people
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
+                      {startDate ? formatDate(startDate) : 'Today'}
                     </div>
                   </div>
 
                   {/* Due Date */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Due date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
                     <div className="relative">
                       <button
                         onClick={() => {
                           setShowDatePicker(!showDatePicker);
-                          setSelectingMode('due'); // Default to due date mode
+                          setSelectingMode('due');
                         }}
                         className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={isUpdatingTask}
                       >
                         <div className="flex items-center space-x-2">
                           <i className="ri-calendar-line text-gray-400"></i>
-                          <span className="text-sm text-gray-700">{formatDateRange()}</span>
+                          <span className="text-sm text-gray-700">{dueDate ? formatDate(dueDate) : 'No due date'}</span>
                         </div>
-                        {(startDate || dueDate) && (
-                          <button
+                        {dueDate && (
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleClearDates();
+                              setDueDate(null);
+                              handleUpdateTask('eta', '');
                             }}
-                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                            title="Clear dates"
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
+                            title="Clear due date"
                           >
                             <i className="ri-close-line text-sm"></i>
-                          </button>
+                          </span>
                         )}
                       </button>
                       
@@ -1539,16 +2023,16 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     {formatDateInput(dueDate) || 'Due date'}
                                   </button>
                                   {dueDate && (
-                                    <button
+                                    <span
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setDueDate(null);
                                       }}
-                                      className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                      className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
                                       title="Clear due date"
                                     >
                                       <i className="ri-close-line text-xs"></i>
-                                    </button>
+                                    </span>
                                   )}
                                 </div>
                               </div>
@@ -1838,98 +2322,473 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     </div>
                   </div>
 
-                  {/* Subtasks */}
+                  {/* Dependencies Section */}
                   <div>
-                    <div className="flex items-center space-x-2 mb-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">Dependencies</label>
                       <button 
-                        onClick={() => setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: !prev[selectedTask._id] }))}
+                        onClick={() => setShowDependenciesDropdown(!showDependenciesDropdown)}
                         className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+                        disabled={isUpdatingTask}
                       >
-                        + Add subtask
-                      </button>
-                      <button className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50">
-                        Draft subtasks
+                        <i className="ri-add-line mr-1"></i>
+                        Add dependency
                       </button>
                     </div>
                     
-                    {/* Add Subtask Input */}
-                    {showSubtaskInput[selectedTask._id] && (
-                      <div className="mb-3">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={newSubtaskName}
-                            onChange={(e) => setNewSubtaskName(e.target.value)}
-                            placeholder="Enter subtask name..."
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && newSubtaskName.trim()) {
-                                handleCreateSubtask(selectedTask._id, newSubtaskName.trim());
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={() => {
-                              if (newSubtaskName.trim()) {
-                                handleCreateSubtask(selectedTask._id, newSubtaskName.trim());
-                              }
-                            }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => {
-                              setNewSubtaskName('');
-                              setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: false }));
-                            }}
-                            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                          >
-                            Cancel
-                          </button>
+                    {showDependenciesDropdown && (
+                      <div className="mb-3 p-3 border border-gray-200 rounded-md bg-gray-50">
+                        <div className="space-y-2">
+                          <div className="text-sm text-gray-600 mb-2">Select tasks that must be completed before this one:</div>
+                          <div className="max-h-32 overflow-y-auto space-y-1">
+                            {availableDependencies.map((task) => (
+                              <label key={task._id} className="flex items-center space-x-2 p-2 hover:bg-white rounded cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDependencies.includes(task._id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedDependencies([...selectedDependencies, task._id]);
+                                    } else {
+                                      setSelectedDependencies(selectedDependencies.filter(id => id !== task._id));
+                                    }
+                                  }}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-900">{task.task}</span>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                  task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {task.status}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                          {availableDependencies.length === 0 && (
+                            <div className="text-center py-4 text-gray-500 text-sm">
+                              No other tasks available for dependencies
+                            </div>
+                          )}
+                          <div className="flex items-center space-x-2 pt-2">
+                            <button
+                              onClick={() => {
+                                // TODO: Implement dependency update API call
+                                setShowDependenciesDropdown(false);
+                              }}
+                              className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                            >
+                              Save Dependencies
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedDependencies([]);
+                                setShowDependenciesDropdown(false);
+                              }}
+                              className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+                            >
+                              Cancel
+                      </button>
+                    </div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Display Existing Subtasks */}
+                    {/* Display Current Dependencies */}
+                    {selectedDependencies.length > 0 && (
+                      <div className="space-y-2">
+                        {selectedDependencies.map((taskId) => {
+                          const task = availableDependencies.find(t => t._id === taskId);
+                          if (!task) return null;
+                          return (
+                            <div key={taskId} className="flex items-center space-x-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                              <i className="ri-arrow-right-line text-blue-600 text-sm"></i>
+                              <span className="text-sm text-gray-900 flex-1">{task.task}</span>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                task.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {task.status}
+                              </span>
+                              <button
+                                onClick={() => setSelectedDependencies(selectedDependencies.filter(id => id !== taskId))}
+                                className="p-1 text-gray-400 hover:text-gray-600"
+                              >
+                                <i className="ri-close-line text-sm"></i>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
+                    {selectedDependencies.length === 0 && !showDependenciesDropdown && (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        <i className="ri-links-line text-lg mb-1"></i>
+                        <div>No dependencies set</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Enhanced Subtasks Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: !prev[selectedTask._id] }))}
+                          className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+                          disabled={isCreatingSubtask}
+                        >
+                          {isCreatingSubtask ? (
+                            <i className="ri-loader-4-line animate-spin mr-1"></i>
+                          ) : (
+                            <i className="ri-add-line mr-1"></i>
+                          )}
+                          Add subtask
+                        </button>
+                      </div>
+                      
+                      {/* Subtask Progress */}
+                      {taskSubtasks[selectedTask._id] && taskSubtasks[selectedTask._id].length > 0 && (
+                        <div className="flex items-center space-x-2">
+                          <div className="text-xs text-gray-500">
+                            {getSubtaskProgress(selectedTask._id)}% complete
+                          </div>
+                          <div className="w-16 h-2 bg-gray-200 rounded-full">
+                            <div 
+                              className="h-2 bg-green-500 rounded-full transition-all duration-300"
+                              style={{ width: `${getSubtaskProgress(selectedTask._id)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Enhanced Add Subtask Form */}
+                    {showSubtaskInput[selectedTask._id] && (
+                      <div className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50">
+                        <div className="space-y-3">
+                          <div>
+                            <input
+                              type="text"
+                              value={newSubtaskName}
+                              onChange={(e) => setNewSubtaskName(e.target.value)}
+                              placeholder="Enter subtask name..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && newSubtaskName.trim()) {
+                                  handleCreateSubtask(selectedTask._id, newSubtaskName.trim());
+                                }
+                              }}
+                              disabled={isCreatingSubtask}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-3">
+                            {/* Priority */}
+                            <div className="relative">
+                              <select
+                                value={subtaskPriority}
+                                onChange={(e) => setSubtaskPriority(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                disabled={isCreatingSubtask}
+                              >
+                                <option value="Low">Low Priority</option>
+                                <option value="Medium">Medium Priority</option>
+                                <option value="High">High Priority</option>
+                                <option value="Urgent">Urgent</option>
+                              </select>
+                            </div>
+                            
+                            {/* Status */}
+                            <div className="relative">
+                              <select
+                                value={subtaskStatus}
+                                onChange={(e) => setSubtaskStatus(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                disabled={isCreatingSubtask}
+                              >
+                                <option value="Yet to Start">Yet to Start</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Blocked">Blocked</option>
+                                <option value="On Hold">On Hold</option>
+                              </select>
+                            </div>
+                            
+                            {/* Assignee */}
+                            <div className="relative">
+                              <select
+                                value={subtaskAssignee}
+                                onChange={(e) => setSubtaskAssignee(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                disabled={isCreatingSubtask}
+                              >
+                                <option value="">Unassigned</option>
+                                {mockAssignees.map((assignee) => (
+                                  <option key={assignee.id} value={assignee.id}>
+                                    {assignee.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => {
+                                if (newSubtaskName.trim()) {
+                                  handleCreateSubtask(selectedTask._id, newSubtaskName.trim());
+                                }
+                              }}
+                              disabled={isCreatingSubtask || !newSubtaskName.trim()}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isCreatingSubtask ? 'Creating...' : 'Create Subtask'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNewSubtaskName('');
+                                setSubtaskPriority('Low');
+                                setSubtaskStatus('Yet to Start');
+                                setSubtaskAssignee('');
+                                setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: false }));
+                              }}
+                              disabled={isCreatingSubtask}
+                              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Enhanced Subtasks List */}
                     {taskSubtasks[selectedTask._id] && taskSubtasks[selectedTask._id].length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-sm font-medium text-gray-700 mb-2">Subtasks ({taskSubtasks[selectedTask._id].length})</div>
-                        <div className="space-y-2">
-                          {taskSubtasks[selectedTask._id].map((subtask) => (
-                            <div key={subtask._id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-md">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-gray-700">
+                            Subtasks ({(taskSubtasks[selectedTask._id] || []).length})
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {(taskSubtasks[selectedTask._id] || []).filter(s => s.status === 'Completed').length} of {(taskSubtasks[selectedTask._id] || []).length} completed
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {(() => {
+                            console.log('Rendering subtasks for selectedTask._id:', selectedTask._id);
+                            console.log('taskSubtasks state:', taskSubtasks);
+                            console.log('taskSubtasks[selectedTask._id]:', taskSubtasks[selectedTask._id]);
+                            const subtasks = taskSubtasks[selectedTask._id] || [];
+                            if (subtasks.length > 0) {
+                              console.log('First subtask structure:', subtasks[0]);
+                              console.log('Subtask fields:', Object.keys(subtasks[0]));
+                            }
+                            return subtasks;
+                          })().map((subtask, index) => (
+                            <div key={subtask._id} className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md hover:bg-gray-50">
+                              {/* Completion Checkbox */}
                               <button 
-                                onClick={() => handleSubtaskStatusChange(subtask._id, subtask.status === 'Completed' ? 'Yet to Start' : 'Completed')}
-                                className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                                onClick={() => handleSubtaskComplete(subtask._id, subtask.status !== 'Completed')}
+                                className="w-5 h-5 border-2 border-gray-300 rounded flex items-center justify-center hover:border-gray-400 transition-colors"
+                                disabled={isUpdatingSubtask}
                               >
                                 {subtask.status === 'Completed' ? (
-                                  <i className="ri-check-line text-xs text-green-600"></i>
+                                  <i className="ri-check-line text-sm text-green-600"></i>
                                 ) : (
-                                  <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                                  <i className="ri-checkbox-blank-line text-sm text-gray-400"></i>
                                 )}
                               </button>
-                              <span className={`text-sm ${subtask.status === 'Completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                                {subtask.task}
-                              </span>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                subtask.priority === 'High' ? 'bg-purple-100 text-purple-800' : 
-                                subtask.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {subtask.priority}
-                              </span>
+                              
+                              {/* Subtask Content */}
+                              <div className="flex-1 min-w-0">
+                                {editingSubtaskId === subtask._id ? (
+                                  // Editing mode
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={editingSubtaskTitle}
+                                      onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      placeholder="Subtask title..."
+                                      autoFocus
+                                    />
+                                    <div className="flex space-x-2">
+                                      <select
+                                        value={editingSubtaskPriority}
+                                        onChange={(e) => setEditingSubtaskPriority(e.target.value)}
+                                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      >
+                                        <option value="Low">Low</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High</option>
+                                        <option value="Urgent">Urgent</option>
+                                      </select>
+                                      <select
+                                        value={editingSubtaskStatus}
+                                        onChange={(e) => setEditingSubtaskStatus(e.target.value)}
+                                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      >
+                                        <option value="Yet to Start">Yet to Start</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Blocked">Blocked</option>
+                                        <option value="On Hold">On Hold</option>
+                                      </select>
+                                      <select
+                                        value={editingSubtaskAssignee}
+                                        onChange={(e) => setEditingSubtaskAssignee(e.target.value)}
+                                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      >
+                                        <option value="">Unassigned</option>
+                                        {Array.isArray(brandUsers) && brandUsers.map((user, index) => (
+                                          <option key={user._id || `user-${index}`} value={user._id}>
+                                            {user.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                      <button
+                                        onClick={() => handleSaveSubtaskEdit(subtask._id)}
+                                        disabled={isUpdatingSubtask || !editingSubtaskTitle.trim()}
+                                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                      >
+                                        {isUpdatingSubtask ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button
+                                        onClick={handleCancelSubtaskEdit}
+                                        disabled={isUpdatingSubtask}
+                                        className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // Viewing mode
+                                  <div className="flex items-center space-x-2">
+                                    <span className={`text-sm font-medium ${subtask.status === 'Completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                      {subtask.title || subtask.task}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      subtask.priority === 'Urgent' ? 'bg-red-100 text-red-800' :
+                                      subtask.priority === 'High' ? 'bg-purple-100 text-purple-800' : 
+                                      subtask.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {subtask.priority}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      subtask.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                      subtask.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                                      subtask.status === 'Blocked' ? 'bg-red-100 text-red-800' :
+                                      subtask.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {subtask.status}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Subtask Actions - Only show in viewing mode */}
+                                {editingSubtaskId !== subtask._id && (
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    {subtask.assignedTo && (
+                                      <div className="flex items-center space-x-1">
+                                        <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                                          <span className="text-white text-xs font-bold">
+                                            {(() => {
+                                              // Handle both object and string assignedTo
+                                              const assigneeId = typeof subtask.assignedTo === 'object' ? subtask.assignedTo._id : subtask.assignedTo;
+                                              const user = Array.isArray(brandUsers) ? brandUsers.find(a => a._id === assigneeId || a.id === assigneeId) : null;
+                                              return user?.name?.charAt(0)?.toUpperCase() || 'U';
+                                            })()}
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-gray-500">
+                                          {(() => {
+                                            // Handle both object and string assignedTo
+                                            const assigneeId = typeof subtask.assignedTo === 'object' ? subtask.assignedTo._id : subtask.assignedTo;
+                                            const user = Array.isArray(brandUsers) ? brandUsers.find(a => a._id === assigneeId || a.id === assigneeId) : null;
+                                            
+                                            // Debug logging
+                                            console.log('=== ASSIGNEE DISPLAY DEBUG ===');
+                                            console.log('subtask.assignedTo:', subtask.assignedTo);
+                                            console.log('assigneeId:', assigneeId);
+                                            console.log('brandUsers:', brandUsers);
+                                            console.log('brandUsers[0]:', brandUsers[0]);
+                                            console.log('brandUsers[0]._id:', brandUsers[0]?._id);
+                                            console.log('brandUsers[0].id:', brandUsers[0]?.id);
+                                            console.log('brandUsers[0].userId:', brandUsers[0]?.userId);
+                                            console.log('ID comparison:', assigneeId === brandUsers[0]?._id);
+                                            console.log('ID comparison (id field):', assigneeId === brandUsers[0]?.id);
+                                            console.log('ID comparison (userId field):', assigneeId === brandUsers[0]?.userId);
+                                            console.log('found user:', user);
+                                            console.log('=== END ASSIGNEE DISPLAY DEBUG ===');
+                                            
+                                            return user?.name || 'Unknown';
+                                          })()}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {(subtask.eta || subtask.dueDate) && (
+                                      <div className="flex items-center space-x-1">
+                                        <i className="ri-calendar-line text-xs text-gray-400"></i>
+                                        <span className="text-xs text-gray-500">
+                                          {new Date(subtask.eta || subtask.dueDate).toLocaleDateString()}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Subtask Actions */}
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditSubtask(subtask)}
+                                  className="p-1 text-blue-600 hover:text-blue-800"
+                                  disabled={isUpdatingSubtask}
+                                  title="Edit subtask"
+                                >
+                                  <i className="ri-edit-line text-sm"></i>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSubtask(subtask._id)}
+                                  className="p-1 text-red-600 hover:text-red-800"
+                                  disabled={isUpdatingSubtask}
+                                  title="Delete subtask"
+                                >
+                                  <i className="ri-delete-bin-line text-sm"></i>
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Empty State */}
+                    {(!taskSubtasks[selectedTask._id] || taskSubtasks[selectedTask._id].length === 0) && (
+                      <div className="text-center py-6 text-gray-500">
+                        <i className="ri-task-line text-2xl mb-2"></i>
+                        <div className="text-sm">No subtasks yet</div>
+                        <div className="text-xs">Add subtasks to break down this task into smaller parts</div>
                       </div>
                     )}
                   </div>
 
                   {/* Comments/Activity */}
                   <div>
-                    <CommentsSection
+                    <DynamicCommentsSection
                       taskId={selectedTask._id}
-                      brandId={selectedTask.brandId || '1'}
+                      brandId={currentBrand?.id || '68d38eed5a9174ab9e766851'}
                       currentUser={{
                         id: currentUser?.id || 'user1',
                         name: currentUser?.name || 'Sumit Mishra',

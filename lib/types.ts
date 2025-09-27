@@ -76,7 +76,7 @@ export interface NewTask {
   description?: string;
   taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring' | 'To do';
+  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   assignedTo: string;
   reporter: string;
   startDate?: string;

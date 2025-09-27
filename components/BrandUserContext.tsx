@@ -28,10 +28,22 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       
+      console.log('BrandUserContext - Fetching users for brand:', brandId);
       const response = await apiService.getBrandUsers(brandId);
+      console.log('BrandUserContext - API response:', response);
+      console.log('BrandUserContext - API response.success:', response.success);
+      console.log('BrandUserContext - API response.data:', response.data);
+      console.log('BrandUserContext - API response.data type:', typeof response.data);
+      console.log('BrandUserContext - API response.data length:', Array.isArray(response.data) ? response.data.length : 'Not an array');
+      
       if (response.success) {
-        setBrandUsers(response.data || []);
+        const users = response.data || [];
+        console.log('BrandUserContext - Setting brand users:', users);
+        console.log('BrandUserContext - Users count:', users.length);
+        console.log('BrandUserContext - Users details:', users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
+        setBrandUsers(users);
       } else {
+        console.error('BrandUserContext - API error:', response.message);
         setError(response.message || 'Failed to load brand users');
       }
     } catch (error: any) {
@@ -67,7 +79,9 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
   const inviteUserToBrand = async (brandId: string, inviteData: InviteUserRequest) => {
     try {
       setError(null);
+      console.log('BrandUserContext - Inviting user to brand:', { brandId, inviteData });
       const response = await apiService.inviteUserToBrand(brandId, inviteData);
+      console.log('BrandUserContext - Invite response:', response);
       
       // Handle specific error cases
       if (!response.success) {
@@ -87,7 +101,9 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
       }
       
       // Refresh users list
+      console.log('BrandUserContext - Invite successful, refreshing user list...');
       await getBrandUsers(brandId);
+      console.log('BrandUserContext - User list refreshed after invite');
       return response;
     } catch (error: any) {
       console.error('Error inviting user to brand:', error);
