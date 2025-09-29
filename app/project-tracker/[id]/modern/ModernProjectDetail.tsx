@@ -11,6 +11,7 @@ import { useTasks } from '../../../../components/TaskContext';
 import { useProjects } from '../../../../components/ProjectContext';
 import { useBrand } from '../../../../components/BrandContext';
 import { useSubtasks } from '../../../../components/SubtaskContext';
+import { useSidebar } from '../../../../components/SidebarContext';
 
 interface ModernProjectDetailProps {
   projectId: string;
@@ -20,9 +21,10 @@ interface ModernProjectDetailProps {
 export default function ModernProjectDetail({ projectId, selectedBrand = null }: ModernProjectDetailProps) {
   // Context hooks
   const { tasks, loading: tasksLoading, error: tasksError, getProjectTasks, createTask, updateTask, updateTaskStatus, updateTaskPriority, assignTask } = useTasks();
-  const { projects, getProjectDetails } = useProjects();
+  const { projects, getProjectDetails, currentProject } = useProjects();
   const { currentBrand } = useBrand();
   const { subtasks, getTaskSubtasks, createSubtask, updateSubtaskStatus: updateSubtaskStatusContext } = useSubtasks();
+  const { closeBothSidebars } = useSidebar();
   
   // Local state
   const [project, setProject] = useState<Project | null>(null);
@@ -230,11 +232,14 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       try {
         setLoading(true);
         
-        // Load project details
+        // Load project details into context
         if (projectId) {
           try {
+            console.log('Loading project with:', { brandId: currentBrand.id, projectId });
             const projectData = await getProjectDetails(currentBrand.id, projectId);
+            console.log('Project data received:', projectData);
             if (projectData.success && projectData.data) {
+              console.log('Setting project data:', projectData.data);
               setProject(projectData.data);
             } else {
               console.error('Failed to load project:', projectData.message);
@@ -299,6 +304,24 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showAddTaskDropdown, showFilterDropdown, showUserDropdown, showAssigneeDropdown, showDatePicker, activeField]);
+
+  // Update assignee display when brandUsers are loaded and we have a selected task
+  useEffect(() => {
+    if (selectedTask && brandUsers.length > 0 && !selectedAssignee) {
+      const assigneeId = selectedTask.assignedTo?.id || selectedTask.assignedTo;
+      console.log('useEffect: Setting up assignee with ID:', assigneeId);
+      console.log('useEffect: Available brand users:', brandUsers);
+      
+      if (assigneeId) {
+        const assignee = brandUsers.find(u => (u._id === assigneeId) || (u.id === assigneeId));
+        console.log('useEffect: Found assignee:', assignee);
+        if (assignee) {
+          setSelectedAssignee(assignee);
+          setAssigneeSearch(`${assignee.name} (${assignee.email})`);
+        }
+      }
+    }
+  }, [brandUsers, selectedTask, selectedAssignee]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -406,24 +429,44 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
   // Handle assignee selection
   const handleAssigneeSelect = async (assignee: any, isEmail = false) => {
-    if (!editingTask || !currentBrand) return;
+    console.log('=== ASSIGNEE SELECT DEBUG ===');
+    console.log('editingTask:', editingTask);
+    console.log('currentBrand:', currentBrand);
+    console.log('assignee:', assignee);
+    console.log('isEmail:', isEmail);
+    
+    if (!editingTask || !currentBrand) {
+      console.log('Missing editingTask or currentBrand, returning early');
+      return;
+    }
     
     try {
       setIsUpdatingTask(true);
       
       if (isEmail && isValidEmail(assignee)) {
         // Handle email assignment
+        console.log('Assigning by email:', assignee);
         await apiService.assignBrandTask(currentBrand.id, editingTask._id, assignee);
         setSelectedAssignee({ email: assignee, name: assignee, isEmail: true });
         setAssigneeSearch(assignee);
-      } else if (assignee._id) {
+      } else if (assignee._id || assignee.id) {
         // Handle user assignment
-        await apiService.assignBrandTask(currentBrand.id, editingTask._id, assignee._id);
+        const assigneeId = assignee._id || assignee.id;
+        console.log('Assigning by user ID:', assigneeId);
+        console.log('API call parameters:', {
+          brandId: currentBrand.id,
+          taskId: editingTask._id,
+          assignedTo: assigneeId
+        });
+        await apiService.assignBrandTask(currentBrand.id, editingTask._id, assigneeId);
         setSelectedAssignee(assignee);
         setAssigneeSearch(`${assignee.name} (${assignee.email})`);
+      } else {
+        console.log('Invalid assignee object - no _id or id field');
       }
       
       // Refresh tasks
+      console.log('Refreshing tasks after assignment...');
       await getProjectTasks(currentBrand.id, projectId);
       setShowAssigneeDropdown(false);
       
@@ -432,6 +475,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     } finally {
       setIsUpdatingTask(false);
     }
+    
+    console.log('=== END ASSIGNEE SELECT DEBUG ===');
   };
 
   const handleTaskSelect = async (task: any) => {
@@ -445,6 +490,18 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     setEditingTaskAssignee(task.assignedTo?.id || task.assignedTo || '');
     setEditingTaskPriority(task.priority || 'Low');
     setEditingTaskStatus(task.status || 'Yet to Start');
+    
+    // Set dependencies
+    console.log('=== LOADING TASK DEPENDENCIES DEBUG ===');
+    console.log('Task object:', JSON.stringify(task, null, 2));
+    console.log('Task.dependencies:', task.dependencies);
+    console.log('Task.dependencies type:', typeof task.dependencies);
+    console.log('Task keys:', Object.keys(task));
+    console.log('All task fields:', Object.entries(task));
+    setSelectedDependencies(task.dependencies || []);
+    console.log('Set selectedDependencies to:', task.dependencies || []);
+    console.log('=== END LOADING DEPENDENCIES DEBUG ===');
+    
     // Set dates properly
     if (task.startDate) {
       setStartDate(new Date(task.startDate));
@@ -461,22 +518,50 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     setEditingTaskDueDate(task.eta || task.dueDate || '');
     setShowTaskDetails(true);
     
-    // Set selected assignee
+    // Close both sidebars when opening task details
+    closeBothSidebars();
+    
+    console.log('Task details panel should be visible now');
+    
+    // Load brand users if not loaded and get fresh users for assignee lookup
+    let freshBrandUsers = brandUsers;
+    if (brandUsers.length === 0) {
+      await loadBrandUsers();
+      // Get fresh users directly from API for immediate use
+      try {
+        if (!currentBrand?.id) return;
+        const response = await apiService.getBrandUsers(currentBrand.id);
+        let users = [];
+        if (Array.isArray(response)) {
+          users = response;
+        } else if (response && Array.isArray(response.data)) {
+          users = response.data;
+        } else if (response && Array.isArray(response.users)) {
+          users = response.users;
+        }
+        freshBrandUsers = users;
+      } catch (error) {
+        console.error('Error loading fresh brand users:', error);
+        freshBrandUsers = [];
+      }
+    } else {
+      // Use existing brand users
+      freshBrandUsers = brandUsers;
+    }
+    
+    // Set selected assignee AFTER brand users are loaded
     const assigneeId = task.assignedTo?.id || task.assignedTo;
+    console.log('Setting up assignee with ID:', assigneeId);
+    console.log('Available brand users:', freshBrandUsers);
+    
     if (assigneeId) {
-      const assignee = brandUsers.find(u => u._id === assigneeId);
+      const assignee = freshBrandUsers.find(u => (u._id === assigneeId) || (u.id === assigneeId));
+      console.log('Found assignee:', assignee);
       setSelectedAssignee(assignee);
       setAssigneeSearch(assignee ? `${assignee.name} (${assignee.email})` : '');
     } else {
       setSelectedAssignee(null);
       setAssigneeSearch('');
-    }
-    
-    console.log('Task details panel should be visible now');
-    
-    // Load brand users if not loaded
-    if (brandUsers.length === 0) {
-      await loadBrandUsers();
     }
     
     // Load subtasks for the selected task
@@ -1062,20 +1147,35 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     console.log('Date selected:', newDate, 'Mode:', selectingMode);
     
-    if (selectingMode === 'due') {
+    if (selectingMode === 'start') {
+      setStartDate(newDate);
+      console.log('Start date set:', newDate);
+    } else if (selectingMode === 'due') {
       setDueDate(newDate);
       console.log('Due date set:', newDate);
-      // Save the due date to the task
-      if (editingTask && currentBrand) {
-        handleUpdateTask('eta', newDate.toISOString());
-      }
-      // Close the date picker after selecting due date
-      setShowDatePicker(false);
     }
   };
 
-  const handleSaveDates = () => {
+  const handleSaveDates = async () => {
+      if (editingTask && currentBrand) {
+      try {
+        setIsUpdatingTask(true);
+        
+        // Save both dates
+        if (startDate) {
+          await handleUpdateTask('startDate', startDate.toISOString());
+        }
+        if (dueDate) {
+          await handleUpdateTask('eta', dueDate.toISOString());
+        }
+        
     setShowDatePicker(false);
+      } catch (error) {
+        console.error('Error saving dates:', error);
+      } finally {
+        setIsUpdatingTask(false);
+      }
+    }
   };
 
   const handleClearDates = () => {
@@ -1627,8 +1727,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                           ) : (
                             (tasks || []).filter(task => task.status === 'In Progress' && (!currentBrand || task.brand_id === currentBrand.id)).map((task) => (
                               <div key={task._id} className="px-6 py-3 border-b border-gray-100 hover:bg-gray-50">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
+                                <div className="grid grid-cols-12 gap-4 items-center">
+                                  <div className="col-span-1">
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1642,13 +1742,41 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                         <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
                                       )}
                                     </button>
-                                    <span className="text-sm text-gray-900">{task.task}</span>
                                   </div>
-                                  <div className="flex items-center space-x-4">
-                                    <span className="text-sm text-gray-600">{task.assignedTo?.name || 'Unassigned'}</span>
+                                  <div className="col-span-4">
+                                    <div className="flex items-center space-x-2">
+                                      {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleTaskExpansion(task._id);
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <i className={`ri-arrow-${expandedTasks[task._id] ? 'down' : 'right'}-s-line text-sm`}></i>
+                                        </button>
+                                      )}
+                                    <span className="text-sm text-gray-900">{task.task}</span>
+                                      {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
+                                        <span className="text-xs text-gray-500">({taskSubtasks[task._id].length})</span>
+                                      )}
+                                  </div>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <div className="flex items-center space-x-2">
+                                      {getAssigneeAvatar(task)}
+                                      <span className="text-sm text-gray-900">{task.assignedTo?.name || 'Unassigned'}</span>
+                                    </div>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                  </div>
+                                  <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
                                       {task.priority}
                                     </span>
+                                  </div>
+                                  <div className="col-span-2 flex items-center justify-between">
                                     <select 
                                       value={task.status}
                                       onChange={(e) => {
@@ -1664,8 +1792,56 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                       <option value="On Hold">On Hold</option>
                                       <option value="Cancelled">Cancelled</option>
                                     </select>
+                                    <button 
+                                      className="p-1 text-gray-400 hover:text-gray-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTaskSelect(task);
+                                      }}
+                                    >
+                                      <i className="ri-arrow-right-s-line text-sm"></i>
+                                    </button>
                                   </div>
                                 </div>
+                                
+                                {/* Subtasks */}
+                                {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && expandedTasks[task._id] && (
+                                  <div className="bg-gray-50">
+                                    {taskSubtasks[task._id].map((subtask) => (
+                                      <div key={subtask._id} className="px-6 py-3 pl-14 border-b border-gray-100">
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                          <div className="col-span-1">
+                                            <button 
+                                              onClick={() => handleSubtaskStatusChange(subtask._id, subtask.status === 'Completed' ? 'Yet to Start' : 'Completed')}
+                                              className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                                            >
+                                              {subtask.status === 'Completed' ? (
+                                                <i className="ri-check-line text-xs text-green-600"></i>
+                                              ) : (
+                                                <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                                              )}
+                                            </button>
+                                          </div>
+                                          <div className="col-span-4">
+                                            <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
+                                          </div>
+                                          <div className="col-span-2">
+                                            <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                              <i className="ri-user-line text-xs text-gray-400"></i>
+                                            </div>
+                                          </div>
+                                          <div className="col-span-2">
+                                            <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                              <i className="ri-calendar-line text-xs text-gray-400"></i>
+                                            </div>
+                                          </div>
+                                          <div className="col-span-2"></div>
+                                          <div className="col-span-1"></div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))
                           )}
@@ -1699,8 +1875,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                           ) : (
                             (tasks || []).filter(task => task.status === 'Completed' && (!currentBrand || task.brand_id === currentBrand.id)).map((task) => (
                               <div key={task._id} className="px-6 py-3 border-b border-gray-100 hover:bg-gray-50">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
+                                <div className="grid grid-cols-12 gap-4 items-center">
+                                  <div className="col-span-1">
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1710,13 +1886,41 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     >
                                       <i className="ri-check-line text-xs text-green-600"></i>
                                     </button>
-                                    <span className="text-sm text-gray-900 line-through">{task.task}</span>
                                   </div>
-                                  <div className="flex items-center space-x-4">
-                                    <span className="text-sm text-gray-600">{task.assignedTo?.name || 'Unassigned'}</span>
+                                  <div className="col-span-4">
+                                    <div className="flex items-center space-x-2">
+                                      {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleTaskExpansion(task._id);
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <i className={`ri-arrow-${expandedTasks[task._id] ? 'down' : 'right'}-s-line text-sm`}></i>
+                                        </button>
+                                      )}
+                                    <span className="text-sm text-gray-900 line-through">{task.task}</span>
+                                      {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
+                                        <span className="text-xs text-gray-500">({taskSubtasks[task._id].length})</span>
+                                      )}
+                                  </div>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <div className="flex items-center space-x-2">
+                                      {getAssigneeAvatar(task)}
+                                      <span className="text-sm text-gray-900">{task.assignedTo?.name || 'Unassigned'}</span>
+                                    </div>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                  </div>
+                                  <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
                                       {task.priority}
                                     </span>
+                                  </div>
+                                  <div className="col-span-2 flex items-center justify-between">
                                     <select 
                                       value={task.status}
                                       onChange={(e) => {
@@ -1732,8 +1936,56 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                       <option value="On Hold">On Hold</option>
                                       <option value="Cancelled">Cancelled</option>
                                     </select>
+                                    <button 
+                                      className="p-1 text-gray-400 hover:text-gray-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTaskSelect(task);
+                                      }}
+                                    >
+                                      <i className="ri-arrow-right-s-line text-sm"></i>
+                                    </button>
                                   </div>
                                 </div>
+                                
+                                {/* Subtasks */}
+                                {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && expandedTasks[task._id] && (
+                                  <div className="bg-gray-50">
+                                    {taskSubtasks[task._id].map((subtask) => (
+                                      <div key={subtask._id} className="px-6 py-3 pl-14 border-b border-gray-100">
+                                        <div className="grid grid-cols-12 gap-4 items-center">
+                                          <div className="col-span-1">
+                                            <button 
+                                              onClick={() => handleSubtaskStatusChange(subtask._id, subtask.status === 'Completed' ? 'Yet to Start' : 'Completed')}
+                                              className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                                            >
+                                              {subtask.status === 'Completed' ? (
+                                                <i className="ri-check-line text-xs text-green-600"></i>
+                                              ) : (
+                                                <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                                              )}
+                                            </button>
+                                          </div>
+                                          <div className="col-span-4">
+                                            <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
+                                          </div>
+                                          <div className="col-span-2">
+                                            <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                              <i className="ri-user-line text-xs text-gray-400"></i>
+                                            </div>
+                                          </div>
+                                          <div className="col-span-2">
+                                            <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                              <i className="ri-calendar-line text-xs text-gray-400"></i>
+                                            </div>
+                                          </div>
+                                          <div className="col-span-2"></div>
+                                          <div className="col-span-1"></div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))
                           )}
@@ -1754,10 +2006,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
             </div>
 
             {/* Task Details Panel */}
-            {showTaskDetails && selectedTask && (() => {
-              console.log('Rendering task details panel for:', selectedTask.task);
-              return true;
-            })() && (
+            {showTaskDetails && selectedTask && (
               <div className="w-1/3 bg-gray-50 border-l border-gray-200 flex flex-col">
                 {/* Task Details Header */}
                 <div className="p-4 border-b border-gray-200">
@@ -1774,31 +2023,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                       disabled={isUpdatingTask}
                     >
                       <i className="ri-close-line text-lg"></i>
-                    </button>
-                  </div>
-                  
-                  {/* Task Action Buttons */}
-                  <div className="flex items-center space-x-2 mt-4">
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Like">
-                      <i className="ri-thumb-up-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Attachments">
-                      <i className="ri-paperclip-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Comments">
-                      <i className="ri-chat-3-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Link">
-                      <i className="ri-links-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Fullscreen">
-                      <i className="ri-fullscreen-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="More options">
-                      <i className="ri-more-2-line text-lg"></i>
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-gray-600" title="Next task">
-                      <i className="ri-arrow-right-s-line text-lg"></i>
                     </button>
                   </div>
                 </div>
@@ -1829,11 +2053,42 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     />
                   </div>
 
-                  {/* Project Field */}
+                  {/* Projects */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
-                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
-                      {project?.title || 'Loading project...'}
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Projects</label>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
+                        <span className="text-sm text-gray-900">
+                          {(() => {
+                            console.log('=== PROJECT DEBUG ===');
+                            console.log('Current project from context:', currentProject);
+                            console.log('Current project title:', currentProject?.title);
+                            console.log('Current project keys:', currentProject ? Object.keys(currentProject) : 'null');
+                            console.log('Local project state:', project);
+                            console.log('Local project title:', project?.title);
+                            console.log('Local project keys:', project ? Object.keys(project) : 'null');
+                            console.log('Loading state:', loading);
+                            console.log('Current brand:', currentBrand);
+                            console.log('Project ID:', projectId);
+                            console.log('=== END PROJECT DEBUG ===');
+                            // Try multiple sources for project name
+                            const projectFromContext = currentProject?.title;
+                            const projectFromLocal = project?.title;
+                            const projectFromList = projects.find(p => p._id === projectId || p.id === projectId)?.title;
+                            
+                            console.log('Project name sources:', {
+                              context: projectFromContext,
+                              local: projectFromLocal,
+                              list: projectFromList,
+                              projectId
+                            });
+                            
+                            return projectFromContext || projectFromLocal || projectFromList || (loading ? "Loading..." : "Project not found");
+                          })()}
+                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">To do</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1859,6 +2114,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                         disabled={isUpdatingTask}
                       />
                       
+                      
                       {showAssigneeDropdown && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
                           <div className="p-2">
@@ -1870,7 +2126,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                               )
                               .map((user) => (
                                 <div 
-                                  key={user._id}
+                                  key={user._id || user.id}
                                   onClick={() => handleAssigneeSelect(user)}
                                   className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
                                 >
@@ -1922,47 +2178,39 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     </div>
                   </div>
 
-                  {/* Description */}
+                  {/* Date */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                    <textarea
-                      value={editingTaskDescription}
-                      onChange={(e) => setEditingTaskDescription(e.target.value)}
-                      onBlur={() => {
-                        if (editingTaskDescription !== selectedTask.description) {
-                          handleUpdateTask('description', editingTaskDescription);
-                        }
-                      }}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Add a description..."
-                      disabled={isUpdatingTask}
-                    />
-                  </div>
-
-                  {/* Start Date */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-gray-700">
-                      {startDate ? formatDate(startDate) : 'Today'}
-                    </div>
-                  </div>
-
-                  {/* Due Date */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
                     <div className="relative">
                       <button
                         onClick={() => {
                           setShowDatePicker(!showDatePicker);
                           setSelectingMode('due');
                         }}
-                        className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                         disabled={isUpdatingTask}
                       >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i className="ri-calendar-line text-blue-600 text-sm"></i>
+                          </div>
+                          <div className="flex flex-col space-y-1">
+                            {startDate && (
                         <div className="flex items-center space-x-2">
-                          <i className="ri-calendar-line text-gray-400"></i>
-                          <span className="text-sm text-gray-700">{dueDate ? formatDate(dueDate) : 'No due date'}</span>
+                                <span className="text-xs text-gray-500 font-medium">Start:</span>
+                                <span className="text-sm text-gray-900 font-medium">{formatDate(startDate)}</span>
+                              </div>
+                            )}
+                            {dueDate && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 font-medium">Due:</span>
+                                <span className="text-sm text-gray-900 font-medium">{formatDate(dueDate)}</span>
+                              </div>
+                            )}
+                            {!startDate && !dueDate && (
+                              <span className="text-sm text-gray-500">No dates set</span>
+                            )}
+                          </div>
                         </div>
                         {dueDate && (
                           <span
@@ -2162,25 +2410,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     </div>
                   </div>
 
-                  {/* Projects */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Projects</label>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-                      <span className="text-sm text-gray-900">Sumit's first project</span>
-                      <span className="text-xs text-gray-500">To do</span>
-                      <button className="p-1 text-gray-400 hover:text-gray-600">
-                        <i className="ri-close-line text-sm"></i>
-                      </button>
-                    </div>
-                    <button className="text-sm text-blue-600 hover:text-blue-800 mt-1">Add to projects</button>
-                  </div>
 
-                  {/* Dependencies */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Dependencies</label>
-                    <button className="text-sm text-blue-600 hover:text-blue-800">Add dependencies</button>
-                  </div>
 
                   {/* Fields */}
                   <div>
@@ -2281,9 +2511,32 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                     <div className="border border-gray-300 rounded-md">
                       <textarea
+                        value={editingTaskDescription}
+                        onChange={(e) => setEditingTaskDescription(e.target.value)}
+                        onBlur={() => {
+                          if (editingTaskDescription !== selectedTask?.description && editingTaskDescription.trim()) {
+                            console.log('Saving description:', editingTaskDescription.trim());
+                            handleUpdateTask('description', editingTaskDescription.trim());
+                          }
+                        }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey && editingTaskDescription.trim()) {
+                            handleUpdateTask('description', editingTaskDescription.trim());
+                          }
+                        }}
                         className="w-full px-3 py-2 focus:outline-none resize-none h-24"
-                        placeholder="Type / for menu"
+                        placeholder="Add a description for this task..."
+                        disabled={isUpdatingTask}
                       />
+                      
+                      {/* Save Indicator */}
+                      {isUpdatingTask && (
+                        <div className="px-3 py-1 text-xs text-blue-600 bg-blue-50 border-t border-gray-200">
+                          <i className="ri-loader-4-line animate-spin mr-1"></i>
+                          Saving description...
+                        </div>
+                      )}
+                      
                       {/* Rich Text Editor Toolbar */}
                       <div className="flex items-center space-x-1 px-3 py-2 border-t border-gray-200 bg-gray-50">
                         <button className="p-1 text-gray-400 hover:text-gray-600" title="Bold">
@@ -2316,7 +2569,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                           <i className="ri-magic-line text-sm"></i>
                         </button>
                         <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                          Create task
+                          Add description
                         </button>
                       </div>
                     </div>
@@ -2373,13 +2626,64 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                           )}
                           <div className="flex items-center space-x-2 pt-2">
                             <button
-                              onClick={() => {
-                                // TODO: Implement dependency update API call
+                              onClick={async () => {
+                                if (!editingTask || !currentBrand) return;
+                                
+                                try {
+                                  setIsUpdatingTask(true);
+                                  console.log('=== SAVING DEPENDENCIES DEBUG ===');
+                                  console.log('currentBrand.id:', currentBrand.id);
+                                  console.log('editingTask._id:', editingTask._id);
+                                  console.log('selectedDependencies:', selectedDependencies);
+                                  console.log('selectedDependencies type:', typeof selectedDependencies);
+                                  console.log('selectedDependencies length:', selectedDependencies.length);
+                                  
+                                  // Try specific dependencies endpoint first
+                                  let response;
+                                  try {
+                                    console.log('Trying specific dependencies endpoint...');
+                                    response = await apiService.updateTaskDependencies(currentBrand.id, editingTask._id, selectedDependencies);
+                                    console.log('Dependencies endpoint response:', response);
+                                  } catch (depsError) {
+                                    console.log('Dependencies endpoint failed, trying general update:', depsError);
+                                    // Fallback to general update endpoint
+                                    const updateData = {
+                                      dependencies: selectedDependencies
+                                    };
+                                    console.log('API call data:', updateData);
+                                    response = await apiService.updateBrandTask(currentBrand.id, editingTask._id, updateData);
+                                    console.log('General update response:', response);
+                                  }
+                                  
+                                  // Update the editing task with new dependencies
+                                  setEditingTask({
+                                    ...editingTask,
+                                    dependencies: selectedDependencies
+                                  });
+                                  
+                                  // Also update the selectedTask to reflect the new dependencies
+                                  setSelectedTask({
+                                    ...selectedTask,
+                                    dependencies: selectedDependencies
+                                  });
+                                  
                                 setShowDependenciesDropdown(false);
+                                  console.log('Dependencies saved successfully');
+                                  
+                                  console.log('=== END DEPENDENCIES DEBUG ===');
+                                } catch (error) {
+                                  console.error('=== DEPENDENCIES ERROR ===');
+                                  console.error('Error saving dependencies:', error);
+                                  console.error('Error details:', error);
+                                  console.error('=== END DEPENDENCIES ERROR ===');
+                                } finally {
+                                  setIsUpdatingTask(false);
+                                }
                               }}
                               className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                              disabled={isUpdatingTask}
                             >
-                              Save Dependencies
+                              {isUpdatingTask ? 'Saving...' : 'Save Dependencies'}
                             </button>
                             <button
                               onClick={() => {
@@ -2803,15 +3107,38 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Collaborators</label>
                     <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">SM</span>
-                      </div>
-                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <i className="ri-user-line text-gray-600 text-sm"></i>
-                      </div>
-                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <i className="ri-user-line text-gray-600 text-sm"></i>
-                      </div>
+                      {brandUsers.length > 0 ? (
+                        brandUsers.map((user, index) => {
+                          const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+                          const colorClasses = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500'];
+                          const avatarColor = colorClasses[index % colorClasses.length];
+                          
+                          return (
+                            <div key={user._id || user.id || index} className="w-8 h-8 rounded-full flex items-center justify-center">
+                              {user.avatar ? (
+                                <img 
+                                  src={user.avatar} 
+                                  alt={user.name} 
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${avatarColor}`}>
+                                  <span className="text-white font-bold text-sm">{initials}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span className="text-white font-bold text-sm">SM</span>
+                          </div>
+                          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                            <i className="ri-user-line text-gray-600 text-sm"></i>
+                          </div>
+                        </>
+                      )}
                       <button className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300">
                         <i className="ri-add-line text-gray-600 text-sm"></i>
                       </button>

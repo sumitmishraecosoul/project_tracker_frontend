@@ -9,8 +9,10 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 import { DEPARTMENTS } from '../../lib/constants';
 import { Task, User } from '../../lib/types';
+import { useSidebar } from '../../components/SidebarContext';
 
 export default function TaskTracker() {
+  const { closeBothSidebars } = useSidebar();
   const [users, setUsers] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeUserId, setActiveUserId] = useState<string>('');
@@ -341,6 +343,16 @@ export default function TaskTracker() {
     console.log('Edit task clicked:', task);
     setEditingTask(task);
     setIsEditModalOpen(true);
+    
+    // Close both sidebars when opening task edit modal
+    closeBothSidebars();
+  };
+
+  const handleAddTaskClick = () => {
+    setIsAddModalOpen(true);
+    
+    // Close both sidebars when opening add task modal
+    closeBothSidebars();
   };
 
   const handleSaveTask = (updatedTask: any) => {
@@ -412,7 +424,7 @@ export default function TaskTracker() {
               </div>
               {canCreateTask() && (
                 <button
-                  onClick={() => setIsAddModalOpen(true)}
+                  onClick={handleAddTaskClick}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
                 >
                   <i className="ri-add-line w-5 h-5"></i>
@@ -456,7 +468,7 @@ export default function TaskTracker() {
                       <p className="text-sm text-gray-500">{activeUser.email}</p>
                     </div>
                     <button
-                      onClick={() => setIsAddModalOpen(true)}
+                      onClick={handleAddTaskClick}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer whitespace-nowrap flex items-center"
                     >
                       <i className="ri-add-line w-4 h-4 mr-2"></i>

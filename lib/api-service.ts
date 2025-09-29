@@ -1359,6 +1359,7 @@ class ApiService {
     assignedTo?: string;
     reporter?: string;
     eta?: string;
+    dependencies?: string[];
   }) {
     const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`, {
       method: 'PUT',
@@ -1557,6 +1558,16 @@ class ApiService {
     const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/unassign`, {
       method: 'POST',
       headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 9. Update Task Dependencies
+  async updateTaskDependencies(brandId: string, taskId: string, dependencies: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/dependencies`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ dependencies })
     });
     return this.handleResponse(response);
   }

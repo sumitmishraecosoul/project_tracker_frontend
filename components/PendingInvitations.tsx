@@ -97,25 +97,52 @@ export default function PendingInvitations({
   };
 
   const getTimeAgo = (dateString: string) => {
+    if (!dateString) {
+      return 'Recently';
+    }
+    
     const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Recently';
+    }
+    
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    // If the date is in the future (for expiration dates)
+    if (diffInSeconds < 0) {
+      const futureDiff = Math.abs(diffInSeconds);
+      if (futureDiff < 60) return 'Expires soon';
+      if (futureDiff < 3600) return `Expires in ${Math.floor(futureDiff / 60)}m`;
+      if (futureDiff < 86400) return `Expires in ${Math.floor(futureDiff / 3600)}h`;
+      if (futureDiff < 2592000) return `Expires in ${Math.floor(futureDiff / 86400)}d`;
+      return `Expires ${date.toLocaleDateString()}`;
+    }
 
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
     if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    return date.toLocaleDateString();
+    
+    // For dates older than 30 days, show the actual date
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const isExpired = (expiresAt?: string) => {
     if (!expiresAt) return false;
-    return new Date(expiresAt) < new Date();
+    const date = new Date(expiresAt);
+    return !isNaN(date.getTime()) && date < new Date();
   };
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="p-6">
         <div className="flex items-center justify-center p-8">
           <div className="text-center">
             <i className="ri-loader-4-line animate-spin text-4xl text-blue-600 mb-4"></i>
@@ -128,7 +155,7 @@ export default function PendingInvitations({
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="p-6">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
           <div className="flex items-center">
             <i className="ri-error-warning-line mr-2"></i>
@@ -147,41 +174,49 @@ export default function PendingInvitations({
 
   if (invitations.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12">
-          <i className="ri-mail-line text-5xl text-gray-400 mb-4"></i>
-          <h3 className="text-xl font-medium text-gray-900 mb-2">No Pending Invitations</h3>
-          <p className="text-gray-600">You don't have any pending brand invitations.</p>
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
-            <i className="ri-information-line mr-2"></i>
+      <div className="p-6">
+        <div className="text-center py-16">
+          <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <i className="ri-mail-line text-4xl text-blue-600"></i>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">All Caught Up!</h2>
+          <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
             You don't have any pending brand invitations at the moment.
           </p>
-          <div className="mt-2 text-xs text-blue-600">
-            <p>This means:</p>
-            <ul className="list-disc list-inside mt-1 space-y-1">
-              <li>No one has invited you to join their brand yet</li>
-              <li>You have already accepted/declined all your invitations</li>
-              <li>All your pending invitations have been processed</li>
-              <li>When someone invites you to their brand, it will appear here</li>
+          
+          <div className="bg-white border border-gray-200 rounded-xl p-8 max-w-lg mx-auto shadow-sm">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <i className="ri-check-line text-green-600 text-xl"></i>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">What this means:</h3>
+            <ul className="text-left space-y-2 text-gray-600">
+              <li className="flex items-start">
+                <i className="ri-checkbox-circle-line text-green-500 mr-2 mt-0.5"></i>
+                <span>No new brand invitations to review</span>
+              </li>
+              <li className="flex items-start">
+                <i className="ri-checkbox-circle-line text-green-500 mr-2 mt-0.5"></i>
+                <span>All previous invitations have been processed</span>
+              </li>
+              <li className="flex items-start">
+                <i className="ri-checkbox-circle-line text-green-500 mr-2 mt-0.5"></i>
+                <span>You're up to date with your team collaborations</span>
+              </li>
             </ul>
-            <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded text-green-700">
-              <i className="ri-check-line mr-1"></i>
-              <strong>System Status:</strong> Backend routing issue completely resolved - API working perfectly!
-            </div>
-            <div className="mt-1 p-2 bg-blue-100 border border-blue-300 rounded text-blue-700">
-              <i className="ri-information-line mr-1"></i>
-              <strong>Frontend Status:</strong> Using fixed user-specific API - no more fallback needed
-            </div>
           </div>
-        </div>
+          
+          <div className="mt-8 text-sm text-gray-500">
+            <p>New invitations will appear here when team members invite you to join their brands.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Pending Invitations</h1>
         <p className="text-gray-600">You have {invitations.length} pending brand invitation{invitations.length !== 1 ? 's' : ''}.</p>
@@ -196,98 +231,135 @@ export default function PendingInvitations({
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {invitations.map((invitation) => (
           <div
             key={invitation.id}
-            className={`bg-white border rounded-lg p-6 ${
+            className={`bg-white border-2 rounded-xl shadow-sm transition-all duration-200 ${
               isExpired(invitation.expires_at) 
-                ? 'border-red-200 bg-red-50' 
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'border-red-200 bg-red-50 shadow-red-100' 
+                : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <i className="ri-building-line text-blue-600 text-xl"></i>
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start space-x-4 flex-1">
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center shadow-sm">
+                    <i className="ri-building-line text-blue-600 text-2xl"></i>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xl font-bold text-gray-900 mb-1">
                       {invitation.brand?.name || 'Brand Invitation'}
                     </h3>
-                    <p className="text-sm text-gray-600">
-                      Invited by {invitation.invited_by.name} ({invitation.invited_by.email})
-                    </p>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <i className="ri-user-3-line mr-1"></i>
+                      <span>Invited by <span className="font-semibold text-gray-700">{invitation.invited_by.name}</span></span>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500">
+                      <i className="ri-mail-line mr-1"></i>
+                      <span>{invitation.invited_by.email}</span>
+                    </div>
                     {invitation.brand?.description && (
-                      <p className="text-sm text-gray-500 mt-1">{invitation.brand.description}</p>
+                      <p className="text-sm text-gray-600 mt-2 bg-gray-50 px-3 py-2 rounded-lg border">
+                        {invitation.brand.description}
+                      </p>
                     )}
                   </div>
-                  <div className="text-right">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                </div>
+                
+                <div className="flex flex-col items-end space-y-2">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                    invitation.status === 'pending' 
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
+                      : invitation.status === 'accepted'
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    <i className={`mr-1 ${
                       invitation.status === 'pending' 
-                        ? 'bg-yellow-100 text-yellow-800' 
+                        ? 'ri-time-line' 
                         : invitation.status === 'accepted'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {invitation.status}
-                    </span>
+                        ? 'ri-check-line'
+                        : 'ri-close-line'
+                    }`}></i>
+                    {invitation.status.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center text-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                    <i className="ri-shield-user-line text-blue-600"></i>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide">Role</div>
+                    <div className="font-semibold text-gray-900 capitalize">{invitation.role}</div>
                   </div>
                 </div>
-
-                {invitation.brand?.description && (
-                  <p className="text-gray-700 mb-3">{invitation.brand.description}</p>
-                )}
-
-                <div className="flex items-center space-x-4 text-sm text-gray-500 mb-4">
-                  <span className="flex items-center">
-                    <i className="ri-user-line mr-1"></i>
-                    Role: <span className="font-medium text-gray-700">{invitation.role}</span>
-                  </span>
-                  <span className="flex items-center">
-                    <i className="ri-calendar-line mr-1"></i>
-                    Invited: {getTimeAgo(invitation.invited_at || invitation.created_at)}
-                  </span>
-                  {invitation.expires_at && (
-                    <span className={`flex items-center ${
-                      isExpired(invitation.expires_at) ? 'text-red-600 font-semibold' : 'text-gray-500'
-                    }`}>
-                      <i className="ri-time-line mr-1"></i>
-                      Expires: {getTimeAgo(invitation.expires_at)}
-                    </span>
-                  )}
+                
+                <div className="flex items-center text-sm">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                    <i className="ri-calendar-line text-green-600"></i>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide">Invited</div>
+                    <div className="font-semibold text-gray-900">
+                      {invitation.invited_at || invitation.created_at ? 
+                        getTimeAgo(invitation.invited_at || invitation.created_at || '') : 
+                        'Recently'
+                      }
+                    </div>
+                  </div>
                 </div>
-
-                {isExpired(invitation.expires_at) && (
-                  <div className="bg-red-100 border border-red-200 text-red-700 px-3 py-2 rounded-md mb-4">
-                    <div className="flex items-center">
-                      <i className="ri-error-warning-line mr-2"></i>
-                      <span className="text-sm font-medium">This invitation has expired</span>
+                
+                {invitation.expires_at && (
+                  <div className="flex items-center text-sm">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
+                      isExpired(invitation.expires_at) ? 'bg-red-100' : 'bg-orange-100'
+                    }`}>
+                      <i className={`${isExpired(invitation.expires_at) ? 'ri-error-warning-line text-red-600' : 'ri-time-line text-orange-600'}`}></i>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 uppercase tracking-wide">Expires</div>
+                      <div className={`font-semibold ${
+                        isExpired(invitation.expires_at) ? 'text-red-600' : 'text-gray-900'
+                      }`}>
+                        {getTimeAgo(invitation.expires_at)}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center space-x-2 ml-4">
+              {isExpired(invitation.expires_at) && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                  <div className="flex items-center">
+                    <i className="ri-error-warning-line mr-2 text-lg"></i>
+                    <span className="font-semibold">This invitation has expired and cannot be accepted</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
                 {!isExpired(invitation.expires_at) && (
                   <>
                     <button
                       onClick={() => handleAcceptInvitation(invitation.id)}
                       disabled={processing === invitation.id}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center font-semibold shadow-sm hover:shadow-md"
                     >
                       {processing === invitation.id ? (
                         <i className="ri-loader-4-line animate-spin mr-2"></i>
                       ) : (
                         <i className="ri-check-line mr-2"></i>
                       )}
-                      Accept
+                      Accept Invitation
                     </button>
                     <button
                       onClick={() => handleDeclineInvitation(invitation.id)}
                       disabled={processing === invitation.id}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center font-semibold shadow-sm hover:shadow-md"
                     >
                       {processing === invitation.id ? (
                         <i className="ri-loader-4-line animate-spin mr-2"></i>

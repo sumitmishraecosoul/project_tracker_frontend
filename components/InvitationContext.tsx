@@ -25,6 +25,7 @@ interface PendingInvitation {
   role: string;
   status: 'pending' | 'accepted' | 'declined';
   created_at?: string;
+  invited_at?: string;
   expires_at?: string | null;
 }
 

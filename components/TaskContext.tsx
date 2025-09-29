@@ -86,6 +86,9 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       
       if (response.success && response.data) {
         const tasksData = response.data.tasks || [];
+        console.log('TaskContext - Raw tasks data from API:', tasksData);
+        console.log('TaskContext - First task dependencies:', tasksData[0]?.dependencies);
+        console.log('TaskContext - First task keys:', tasksData[0] ? Object.keys(tasksData[0]) : 'No tasks');
         setTasks(tasksData);
         console.log('TaskContext - Set project tasks:', tasksData);
       } else {

@@ -3,6 +3,87 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 
+// Utility functions for URL detection and copy functionality
+const detectUrls = (text: string): string[] => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.match(urlRegex) || [];
+};
+
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
+    } catch (err) {
+      document.body.removeChild(textArea);
+      return false;
+    }
+  }
+};
+
+const renderTextWithLinks = (text: string) => {
+  const urls = detectUrls(text);
+  if (urls.length === 0) {
+    return <span>{text}</span>;
+  }
+
+  let parts = [text];
+  urls.forEach(url => {
+    const newParts: (string | JSX.Element)[] = [];
+    parts.forEach(part => {
+      if (typeof part === 'string') {
+        const urlIndex = part.indexOf(url);
+        if (urlIndex !== -1) {
+          newParts.push(part.substring(0, urlIndex));
+          newParts.push(
+            <span key={url} className="inline-flex items-center space-x-1">
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {url}
+              </a>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const success = await copyToClipboard(url);
+                  if (success) {
+                    console.log('URL copied to clipboard:', url);
+                  }
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors ml-1"
+                title="Copy URL"
+              >
+                <i className="ri-file-copy-line text-xs"></i>
+              </button>
+            </span>
+          );
+          newParts.push(part.substring(urlIndex + url.length));
+        } else {
+          newParts.push(part);
+        }
+      } else {
+        newParts.push(part);
+      }
+    });
+    parts = newParts;
+  });
+
+  return <span>{parts}</span>;
+};
+
 interface DynamicCommentsSectionProps {
   taskId: string;
   brandId: string;
@@ -309,11 +390,26 @@ const DynamicCommentsSection: React.FC<DynamicCommentsSectionProps> = ({
                       <span className="text-xs text-gray-400">(edited)</span>
                     )}
                   </div>
-                  <p className="text-gray-700 mb-2">{comment.content}</p>
+                  <div className="text-gray-700 mb-2">
+                    {renderTextWithLinks(comment.content)}
+                  </div>
                   
                   {/* Comment Actions */}
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={async () => {
+                          const success = await copyToClipboard(comment.content);
+                          if (success) {
+                            // You could add a toast notification here
+                            console.log('Comment copied to clipboard');
+                          }
+                        }}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Copy comment"
+                      >
+                        <i className="ri-file-copy-line text-sm"></i>
+                      </button>
                       <button
                         onClick={() => handleAddReaction(comment._id, '👍')}
                         className="text-gray-400 hover:text-blue-600 transition-colors"

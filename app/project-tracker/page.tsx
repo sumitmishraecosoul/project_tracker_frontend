@@ -61,31 +61,6 @@ export default function ProjectTrackerPage() {
   return (
       <VerticalLayout>
       <div className="p-6">
-        {/* Debug Info */}
-        <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Debug Info:</h3>
-          <p className="text-xs text-gray-600">Current Brand: {currentBrand?.name || 'None'} (ID: {currentBrand?.id || 'None'})</p>
-          <p className="text-xs text-gray-600">Projects Count: {projects.length}</p>
-          <p className="text-xs text-gray-600">Loading: {isLoading ? 'Yes' : 'No'}</p>
-          <p className="text-xs text-gray-600">Error: {error || 'None'}</p>
-          <button
-            onClick={async () => {
-              try {
-                console.log('Testing backend connection...');
-                const response = await fetch('http://localhost:5000/api/health');
-                const data = await response.text();
-                console.log('Backend health check:', data);
-                alert(`Backend connection: ${response.ok ? 'OK' : 'Failed'}\nResponse: ${data}`);
-              } catch (error) {
-                console.error('Backend connection failed:', error);
-                alert(`Backend connection failed: ${error}`);
-              }
-            }}
-            className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-          >
-            Test Backend Connection
-          </button>
-        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

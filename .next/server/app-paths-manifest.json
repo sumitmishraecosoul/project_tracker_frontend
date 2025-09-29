@@ -1,8 +1,9 @@
 {
   "/project-tracker/[id]/modern/page": "app/project-tracker/[id]/modern/page.js",
-  "/page": "app/page.js",
-  "/project-tracker/page": "app/project-tracker/page.js",
+  "/signup/page": "app/signup/page.js",
   "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/inbox/page": "app/inbox/page.js",
   "/project-tracker/dashboard/page": "app/project-tracker/dashboard/page.js",
   "/invitations/page": "app/invitations/page.js"
 }

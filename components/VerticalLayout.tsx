@@ -1,24 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import React from 'react';
 import VerticalSidebar from './VerticalSidebar';
 import VerticalNavigation from './VerticalNavigation';
+import { useSidebar } from './SidebarContext';
 
 interface VerticalLayoutProps {
   children: React.ReactNode;
 }
 
 export default function VerticalLayout({ children }: VerticalLayoutProps) {
-  const [isBrandsCollapsed, setIsBrandsCollapsed] = useState(false);
-  const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
-
-  const toggleBrands = () => {
-    setIsBrandsCollapsed(!isBrandsCollapsed);
-  };
-
-  const toggleNavigation = () => {
-    setIsNavigationCollapsed(!isNavigationCollapsed);
-  };
+  const { 
+    isBrandsCollapsed, 
+    isNavigationCollapsed, 
+    toggleBrands, 
+    toggleNavigation 
+  } = useSidebar();
 
   return (
     <div className="flex h-screen bg-gray-50" style={{ position: 'relative' }}>
