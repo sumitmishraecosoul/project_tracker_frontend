@@ -65,7 +65,7 @@ export default function VerticalSidebar({
     <>
       <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white shadow-lg border-r border-gray-200 h-screen overflow-y-auto transition-all duration-300 flex-shrink-0`} style={{ minWidth: isCollapsed ? '64px' : '256px', zIndex: 10 }}>
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             {!isCollapsed && (
               <div>
@@ -75,10 +75,10 @@ export default function VerticalSidebar({
             )}
             <button
               onClick={onToggle}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center"
               title={isCollapsed ? 'Expand Brands' : 'Collapse Brands'}
             >
-              <i className={`ri-${isCollapsed ? 'menu-line' : 'close-line'} text-gray-600`}></i>
+              <i className={`ri-${isCollapsed ? 'menu-line' : 'close-line'} text-gray-600 text-lg`}></i>
             </button>
           </div>
         </div>
@@ -100,44 +100,49 @@ export default function VerticalSidebar({
             </div>
           ) : (
             <div className="space-y-2">
-              {displayBrands.map((brand) => (
+              {displayBrands.map((brand) => {
+                const brandInitial = brand.name ? brand.name.charAt(0).toUpperCase() : '?';
+                const brandColor = getBrandColor(brand.name);
+                return (
                 <div
                   key={brand.id}
-                  className={`group cursor-pointer rounded-lg transition-colors ${
-                    currentBrand?.id === brand.id ? 'bg-blue-50 border-2 border-blue-200' : 'hover:bg-gray-50'
-                  }`}
+                  className={`group cursor-pointer rounded-lg transition-colors hover:bg-gray-50`}
                   title={isCollapsed ? brand.name : undefined}
                   onClick={() => handleBrandClick(brand)}
                 >
-                  <div className="flex items-center p-3">
+                  <div className={`flex items-center p-3 pr-8 ${isCollapsed ? 'justify-center' : ''}`}>
                     <div 
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isCollapsed ? '' : 'mr-3'} shadow-sm`}
-                      style={{ backgroundColor: getBrandColor(brand.name) }}
+                      className={`flex-shrink-0 ${!isCollapsed ? 'mr-3' : ''}`}
                     >
-                      <span className="text-white text-sm font-bold">
-                        {brand.name.charAt(0).toUpperCase()}
-                      </span>
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-sm"
+                        style={{ 
+                          backgroundColor: brandColor,
+                          minWidth: '40px !important',
+                          minHeight: '40px !important',
+                          width: '40px !important',
+                          height: '40px !important'
+                        }}
+                      >
+                        {brandInitial}
+                      </div>
                     </div>
                     {!isCollapsed && (
                       <>
                         <div className="flex-1">
-                          <h3 className={`text-sm font-medium ${
-                            currentBrand?.id === brand.id ? 'text-blue-900' : 'text-gray-900 group-hover:text-blue-600'
-                          }`}>
+                          <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
                             {brand.name}
                           </h3>
                           <p className="text-xs text-gray-500">
                             {brand.subscription?.plan?.toUpperCase() || 'FREE'} Plan
                           </p>
                         </div>
-                        {currentBrand?.id === brand.id && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        )}
                       </>
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1422,12 +1422,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                       <div className="col-span-2">Assignee</div>
                       <div className="col-span-2">Due date</div>
                       <div className="col-span-1">Priority</div>
-                      <div className="col-span-2 flex items-center justify-between">
-                        <span>Status</span>
-                        <button className="p-1 text-gray-400 hover:text-gray-600">
-                          <i className="ri-add-line text-sm"></i>
-                        </button>
-                      </div>
+                      <div className="col-span-2 text-center">Status</div>
                     </div>
                   </div>
 
