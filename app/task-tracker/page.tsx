@@ -290,8 +290,8 @@ export default function TaskTracker() {
     
     // Employees can edit tasks assigned to them or created by them
     if (currentUser.role === 'employee') {
-      return task.assignedTo._id === currentUser._id || 
-             task.reporter._id === currentUser._id;
+      return task.assignedTo?._id === currentUser._id || 
+             task.reporter?._id === currentUser._id;
     }
     
     return false;
