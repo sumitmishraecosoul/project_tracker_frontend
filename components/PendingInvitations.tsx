@@ -134,7 +134,7 @@ export default function PendingInvitations({
     });
   };
 
-  const isExpired = (expiresAt?: string) => {
+  const isExpired = (expiresAt?: string | null) => {
     if (!expiresAt) return false;
     const date = new Date(expiresAt);
     return !isNaN(date.getTime()) && date < new Date();
