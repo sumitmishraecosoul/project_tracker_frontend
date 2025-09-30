@@ -30,7 +30,7 @@ export interface Task {
   task: string;
   description?: string;
   status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority: 'High' | 'Medium' | 'Low';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: {
     _id: string;
     name: string;
@@ -359,7 +359,7 @@ export interface CreateTaskData {
   assignedTo: string;
   reporter: string;
   status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority?: 'High' | 'Medium' | 'Low';
+  priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   eta: string;
 }
 
@@ -367,7 +367,7 @@ export interface UpdateTaskData {
   task?: string;
   description?: string;
   status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority?: 'High' | 'Medium' | 'Low';
+  priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   reporter?: string;
   eta?: string;
@@ -417,7 +417,7 @@ export interface Subtask {
   task: string;
   description?: string;
   status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority: 'High' | 'Medium' | 'Low';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: {
     _id: string;
     name: string;
@@ -461,7 +461,7 @@ export interface CreateSubtaskData {
   assignedTo?: string;
   reporter?: string;
   status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority?: 'High' | 'Medium' | 'Low';
+  priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   eta?: string;
   order?: number;
   dueDate?: string;
@@ -476,7 +476,7 @@ export interface UpdateSubtaskData {
   task?: string;
   description?: string;
   status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-  priority?: 'High' | 'Medium' | 'Low';
+  priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   reporter?: string;
   eta?: string;
@@ -501,7 +501,7 @@ export interface SubtaskTemplate {
   subtasks: Array<{
     task: string;
     description?: string;
-    priority: 'High' | 'Medium' | 'Low';
+    priority: 'Critical' | 'High' | 'Medium' | 'Low';
     estimatedHours?: number;
     order: number;
   }>;
@@ -517,7 +517,7 @@ export interface CreateSubtaskTemplateData {
   subtasks: Array<{
     task: string;
     description?: string;
-    priority: 'High' | 'Medium' | 'Low';
+    priority: 'Critical' | 'High' | 'Medium' | 'Low';
     estimatedHours?: number;
     order: number;
   }>;
@@ -529,7 +529,7 @@ export interface UpdateSubtaskTemplateData {
   subtasks?: Array<{
     task: string;
     description?: string;
-    priority: 'High' | 'Medium' | 'Low';
+    priority: 'Critical' | 'High' | 'Medium' | 'Low';
     estimatedHours?: number;
     order: number;
   }>;
