@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactElement } from 'react';
 import { apiService } from '../lib/api-service';
 
 // Utility functions for URL detection and copy functionality
@@ -38,7 +38,7 @@ const renderTextWithLinks = (text: string) => {
 
   let parts = [text];
   urls.forEach(url => {
-    const newParts: (string | JSX.Element)[] = [];
+    const newParts: (string | ReactElement)[] = [];
     parts.forEach(part => {
       if (typeof part === 'string') {
         const urlIndex = part.indexOf(url);
