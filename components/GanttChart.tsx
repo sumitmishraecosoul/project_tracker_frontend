@@ -230,7 +230,7 @@ export default function GanttChart({ projects, tasks }: GanttChartProps) {
     rangeStart: range.start.toLocaleDateString(),
     rangeEnd: range.end.toLocaleDateString(),
     daysLength: days.length,
-    projects: projects.map(p => ({
+    projects: projects.map((p: ProjectItem) => ({
       title: p.title,
       start: p.startDate,
       startDate: new Date(p.startDate).toLocaleDateString(),

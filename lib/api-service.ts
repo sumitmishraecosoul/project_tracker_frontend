@@ -83,12 +83,30 @@ class ApiService {
       try {
         const errorData = await response.json();
         devLog('API Error Data:', errorData);
-        errorMessage = errorData.message || errorData.error || errorData.msg || 'API request failed';
+        
+        // Handle different error message formats
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (typeof errorData === 'object' && errorData !== null) {
+          errorMessage = errorData.message || errorData.error || errorData.msg || errorData.details || JSON.stringify(errorData);
+        } else {
+          errorMessage = String(errorData) || 'API request failed';
+        }
       } catch (parseError) {
         devLog('Failed to parse error response:', parseError);
-        const errorText = await response.text();
-        devLog('Raw error response:', errorText);
-        errorMessage = errorText || 'API request failed';
+        try {
+          const errorText = await response.clone().text();
+          devLog('Raw error response:', errorText);
+          errorMessage = errorText || 'API request failed';
+        } catch (textError) {
+          devLog('Failed to read response text:', textError);
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+      }
+      
+      // Ensure errorMessage is always a string
+      if (typeof errorMessage !== 'string') {
+        errorMessage = JSON.stringify(errorMessage);
       }
       
       // If token invalid/expired, clear storage to force re-login
@@ -152,6 +170,41 @@ class ApiService {
     const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
+      body: JSON.stringify(data)
+    });
+    return this.handleResponse(response);
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(data)
+    });
+    return this.handleResponse(response);
+  }
+
+  async refreshToken() {
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+      method: 'POST',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async forgotPassword(email: string) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return this.handleResponse(response);
+  }
+
+  async resetPassword(data: { token: string; password: string }) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     return this.handleResponse(response);
@@ -248,7 +301,7 @@ class ApiService {
     }
   }
 
-  async createProject(projectData: {
+  async createLegacyProject(projectData: {
     title: string;
     description: string;
     status: string;
@@ -269,7 +322,7 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async updateProject(id: string, projectData: {
+  async updateLegacyProject(id: string, projectData: {
     title?: string;
     description?: string;
     status?: string;
@@ -290,7 +343,7 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async deleteProject(id: string) {
+  async deleteLegacyProject(id: string) {
     const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
       method: 'DELETE',
       headers: this.getAuthHeader()
@@ -298,7 +351,7 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async getProjectTasks(projectId: string) {
+  async getLegacyProjectTasks(projectId: string) {
     const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/tasks`, {
       headers: this.getAuthHeader()
     });
@@ -473,7 +526,7 @@ class ApiService {
       
       devLog('API Service - Update data:', updateData);
       
-      const result = await this.updateProject(projectId, updateData);
+      const result = await this.updateLegacyProject(projectId, updateData);
       devLog('API Service - Project update result:', result);
       return result;
     } catch (error) {
@@ -535,7 +588,7 @@ class ApiService {
       
       devLog('API Service - Update data:', updateData);
       
-      const result = await this.updateProject(projectId, updateData);
+      const result = await this.updateLegacyProject(projectId, updateData);
       devLog('API Service - Project update result:', result);
       return result;
     } catch (error) {
@@ -800,6 +853,1029 @@ class ApiService {
       devError('Failed to fetch departments:', error);
       return [];
     }
+  }
+
+  // Brand Management APIs
+  async getBrands() {
+    const response = await fetch(`${API_BASE_URL}/api/brands`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createBrand(brandData: {
+    name: string;
+    description?: string;
+    logo?: string;
+    settings?: {
+      theme?: string;
+      notifications?: boolean;
+      timezone?: string;
+    };
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(brandData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getBrandDetails(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async updateBrand(brandId: string, brandData: {
+    name?: string;
+    description?: string;
+    logo?: string;
+    settings?: {
+      theme?: string;
+      notifications?: boolean;
+      timezone?: string;
+    };
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(brandData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async switchToBrand(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/switch`, {
+      method: 'POST',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async deleteBrand(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // Brand User Management APIs
+  async getBrandUsers(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/users`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // Notification Management APIs - Updated to match verified backend structure
+  async getBrandNotifications(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    is_read?: boolean;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications?${queryParams}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async getUserNotifications(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    is_read?: boolean;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/user/me?${queryParams}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async markNotificationAsRead(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}/read`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async markAllNotificationsAsRead(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/read-all`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async deleteNotification(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createNotification(brandId: string, notificationData: {
+    recipient: string;
+    type: string;
+    title: string;
+    message: string;
+    entity_type?: string;
+    entity_id?: string;
+    metadata?: any;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(notificationData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getNotificationDetails(brandId: string, notificationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async updateNotification(brandId: string, notificationId: string, updateData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/notifications/${notificationId}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updateData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // Brand Invitation APIs - Updated to match your backend structure with brand context
+  async getPendingInvitations(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/pending`, {
+      method: 'GET',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  // Get user's pending invitations (for invited users)
+  async getUserPendingInvitations() {
+    const response = await fetch(`${API_BASE_URL}/api/users/invitations`, {
+      method: 'GET',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async acceptInvitation(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}/accept`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async declineInvitation(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}/decline`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async getInvitationDetails(brandId: string, invitationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/invitations/${invitationId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async addUserToBrand(brandId: string, userData: {
+    email: string;
+    role: string;
+    permissions?: Partial<any>;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/users`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(userData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async updateUserRole(brandId: string, userId: string, updateData: {
+    role?: string;
+    permissions?: Partial<any>;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/users/${userId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(updateData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async inviteUserToBrand(brandId: string, inviteData: {
+    email: string;
+    role: string;
+    message?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/users/invite`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(inviteData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async removeUserFromBrand(brandId: string, userId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/users/${userId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // Project Management APIs
+  async getBrandProjects(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createProject(brandId: string, projectData: {
+    title: string;
+    description: string;
+    status: string;
+    priority: string;
+    department: string;
+    startDate?: string;
+    endDate?: string;
+    tags?: string[];
+    settings?: any;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(projectData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectDetails(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async updateProject(brandId: string, projectId: string, projectData: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    department?: string;
+    startDate?: string;
+    endDate?: string;
+    tags?: string[];
+    settings?: any;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(projectData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectTasks(brandId: string, projectId: string) {
+    console.log('API Service - getProjectTasks called with:', {
+      brandId,
+      projectId,
+      url: `${API_BASE_URL}/api/brands/${brandId}/tasks?projectId=${projectId}`,
+      headers: this.getAuthHeader()
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks?projectId=${projectId}`, {
+      headers: this.getAuthHeader()
+    });
+    
+    console.log('API Service - getProjectTasks response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  async updateProjectStatus(brandId: string, projectId: string, status: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/status`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ status })
+    });
+    return this.handleResponse(response);
+  }
+
+  async completeProject(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/complete`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async archiveProject(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/archive`, {
+      method: 'PUT',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectSections(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/sections`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createProjectSection(brandId: string, projectId: string, sectionData: {
+    name: string;
+    description: string;
+    order: number;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/sections`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(sectionData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectViews(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/views`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async createProjectView(brandId: string, projectId: string, viewData: {
+    name: string;
+    type: string;
+    settings: any;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/views`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(viewData)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectAnalytics(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/analytics`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async getProjectProgress(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/progress`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  async deleteProject(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // ========================================
+  // PHASE 5: TASK MANAGEMENT APIs
+  // ========================================
+
+  // 1. Get Brand Tasks
+  async getBrandTasks(brandId: string, params?: { page?: number; limit?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    
+    const url = `${API_BASE_URL}/api/brands/${brandId}/tasks${query.toString() ? `?${query.toString()}` : ''}`;
+    const response = await fetch(url, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 2. Create Brand Task
+  async createBrandTask(brandId: string, taskData: {
+    task: string;
+    description?: string;
+    projectId: string;
+    assignedTo: string;
+    reporter: string;
+    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
+    eta: string;
+  }) {
+    console.log('API Service - createBrandTask called with:', {
+      brandId,
+      taskData,
+      url: `${API_BASE_URL}/api/brands/${brandId}/tasks`,
+      headers: this.getAuthHeader()
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(taskData)
+    });
+    
+    console.log('API Service - createBrandTask response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    return this.handleResponse(response);
+  }
+
+  // 3. Get Brand Task by ID
+  async getBrandTaskById(brandId: string, taskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 4. Update Brand Task
+  async updateBrandTask(brandId: string, taskId: string, taskData: {
+    task?: string;
+    description?: string;
+    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
+    assignedTo?: string;
+    reporter?: string;
+    eta?: string;
+    dependencies?: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(taskData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 5. Delete Brand Task
+  async deleteBrandTask(brandId: string, taskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 6. Assign Task
+  async assignBrandTask(brandId: string, taskId: string, assignedTo: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/assign`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ assignedTo })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 7. Update Task Status
+  async updateBrandTaskStatus(brandId: string, taskId: string, status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring') {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/status`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ status })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 8. Update Task Priority
+  async updateBrandTaskPriority(brandId: string, taskId: string, priority: 'Critical' | 'High' | 'Medium' | 'Low') {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/priority`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ priority })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 9. Get Task Analytics
+  async getBrandTaskAnalytics(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/analytics`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 10. Search Tasks
+  async searchBrandTasks(brandId: string, query: string, params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    searchParams.append('q', query);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/search?${searchParams.toString()}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 11. Filter Tasks
+  async filterBrandTasks(brandId: string, filters: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    projectId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value.toString());
+      }
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/filter?${params.toString()}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // ========================================
+  // PHASE 6: SUBTASK MANAGEMENT APIs
+  // ========================================
+
+  // 1. Get Brand Subtasks
+  async getBrandSubtasks() {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 2. Create Brand Subtask
+  async createBrandSubtask(brandId: string, subtaskData: {
+    task_id: string;
+    title: string;
+    description?: string;
+    assignedTo?: string;
+    reporter?: string;
+    status?: string;
+    priority?: string;
+    startDate?: string;
+    dueDate?: string;
+    order?: number;
+    estimatedHours?: number;
+    labels?: string[];
+    attachments?: string[];
+    relatedSubtasks?: string[];
+    sprint?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(subtaskData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 3. Get Brand Subtask by ID
+  async getBrandSubtaskById(subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 4. Update Brand Subtask
+  async updateBrandSubtask(brandId: string, subtaskId: string, subtaskData: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    reporter?: string;
+    eta?: string;
+    order?: number;
+    dueDate?: string;
+    estimatedHours?: number;
+    actualHours?: number;
+    remark?: string;
+    roadBlock?: string;
+    supportNeeded?: string;
+    labels?: string[];
+    attachments?: string[];
+    relatedSubtasks?: string[];
+    sprint?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks/${subtaskId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(subtaskData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 5. Delete Brand Subtask
+  async deleteBrandSubtask(brandId: string, subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks/${subtaskId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 6. Get Task Subtasks
+  async getTaskSubtasks(brandId: string, taskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/subtasks`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 7. Assign Subtask
+  async assignSubtask(subtaskId: string, userId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/assign`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ userId })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 8. Unassign Subtask
+  async unassignSubtask(subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/unassign`, {
+      method: 'POST',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 9. Update Task Dependencies
+  async updateTaskDependencies(brandId: string, taskId: string, dependencies: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/dependencies`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ dependencies })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 9. Update Subtask Status
+  async updateSubtaskStatus(subtaskId: string, status: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/status`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ status })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 10. Update Subtask Priority
+  async updateSubtaskPriority(subtaskId: string, priority: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/priority`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify({ priority })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 11. Reorder Subtasks
+  async reorderSubtasks(request: { subtaskIds: string[] }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/reorder`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(request)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 12. Reorder Task Subtasks
+  async reorderTaskSubtasks(taskId: string, request: { subtaskIds: string[] }) {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/subtasks/reorder`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(request)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 13. Complete Subtask
+  async completeSubtask(subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/complete`, {
+      method: 'POST',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 14. Uncomplete Subtask
+  async uncompleteSubtask(subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/uncomplete`, {
+      method: 'POST',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 15. Get Subtask Templates
+  async getSubtaskTemplates() {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 16. Get Subtask Template by ID
+  async getSubtaskTemplateById(templateId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates/${templateId}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 17. Create Subtask Template
+  async createSubtaskTemplate(templateData: {
+    name: string;
+    description?: string;
+    subtasks: Array<{
+      task: string;
+      description?: string;
+      priority: string;
+      estimatedHours?: number;
+      order: number;
+    }>;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(templateData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 18. Update Subtask Template
+  async updateSubtaskTemplate(templateId: string, templateData: {
+    name?: string;
+    description?: string;
+    subtasks?: Array<{
+      task: string;
+      description?: string;
+      priority: string;
+      estimatedHours?: number;
+      order: number;
+    }>;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates/${templateId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(templateData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 19. Delete Subtask Template
+  async deleteSubtaskTemplate(templateId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates/${templateId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 20. Apply Template to Task
+  async applyTemplateToTask(request: { templateId: string; parentTaskId: string }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtask-templates/apply`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(request)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 21. Get Subtask Analytics
+  async getSubtaskAnalytics() {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/analytics`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 22. Get Subtask Analytics by ID
+  async getSubtaskAnalyticsById(subtaskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/${subtaskId}/analytics`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 23. Get Task Subtask Analytics
+  async getTaskSubtaskAnalytics(taskId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/subtasks/analytics`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 24. Search Subtasks
+  async searchSubtasks(query: string, filters?: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    parentTaskId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/search?${params.toString()}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 25. Filter Subtasks
+  async filterSubtasks(filters: {
+    status?: string;
+    priority?: string;
+    assignedTo?: string;
+    parentTaskId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value.toString());
+      }
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks/filter?${params.toString()}`, {
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // Phase 6: Comments & Activities APIs
+  async getBrandComments(brandId: string, params?: {
+    page?: number;
+    limit?: number;
+    entity_type?: string;
+    entity_id?: string;
+    status?: string;
+  }) {
+    let url = `${API_BASE_URL}/api/brands/${brandId}/comments`;
+    
+    if (params?.entity_type && params?.entity_id) {
+      url = `${API_BASE_URL}/api/brands/${brandId}/${params.entity_type}/${params.entity_id}/comments`;
+    }
+    
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+
+    const response = await fetch(`${url}?${queryParams}`, {
+      method: 'GET',
+      headers: this.getAuthHeader()
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async createBrandComment(brandId: string, commentData: {
+    content: string;
+    entity_type: string;
+    entity_id: string;
+    parent_id?: string;
+    mentions?: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/${commentData.entity_type}/${commentData.entity_id}/comments`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        content: commentData.content,
+        mentions: commentData.mentions || [],
+        attachments: [],
+        parent_comment: commentData.parent_id
+      })
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async updateBrandComment(brandId: string, commentId: string, commentData: {
+    content: string;
+    mentions?: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(commentData)
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async deleteBrandComment(brandId: string, commentId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async addCommentReaction(brandId: string, commentId: string, reaction: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}/reactions`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reaction })
+    });
+
+    return this.handleResponse(response);
+  }
+
+  async removeCommentReaction(brandId: string, commentId: string, reaction: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/comments/${commentId}/reactions`, {
+      method: 'DELETE',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ reaction })
+    });
+
+    return this.handleResponse(response);
   }
 }
 

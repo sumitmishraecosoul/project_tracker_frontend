@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Header from '../../../components/Header';
+import VerticalLayout from '../../../components/VerticalLayout';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import { apiService } from '../../../lib/api-service';
 import { ROLE_LABELS, DEPARTMENTS } from '../../../lib/constants';
@@ -239,23 +239,21 @@ export default function Dashboard() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <Header />
+        <VerticalLayout>
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <p className="text-gray-600">Loading dashboard...</p>
             </div>
           </div>
-        </div>
+        </VerticalLayout>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <VerticalLayout>
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
@@ -524,7 +522,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </VerticalLayout>
     </ProtectedRoute>
   );
 }

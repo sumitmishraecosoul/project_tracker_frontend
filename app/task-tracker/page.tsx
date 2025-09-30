@@ -2,15 +2,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Header from '../../components/Header';
+import VerticalLayout from '../../components/VerticalLayout';
 import AddUserTaskModal from '../../components/AddUserTaskModal';
 import EditTaskModal from '../../components/EditTaskModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 import { DEPARTMENTS } from '../../lib/constants';
 import { Task, User } from '../../lib/types';
+import { useSidebar } from '../../components/SidebarContext';
 
 export default function TaskTracker() {
+  const { closeBothSidebars } = useSidebar();
   const [users, setUsers] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeUserId, setActiveUserId] = useState<string>('');
@@ -288,8 +290,8 @@ export default function TaskTracker() {
     
     // Employees can edit tasks assigned to them or created by them
     if (currentUser.role === 'employee') {
-      return task.assignedTo._id === currentUser._id || 
-             task.reporter._id === currentUser._id;
+      return task.assignedTo?._id === currentUser._id || 
+             task.reporter?._id === currentUser._id;
     }
     
     return false;
@@ -341,6 +343,16 @@ export default function TaskTracker() {
     console.log('Edit task clicked:', task);
     setEditingTask(task);
     setIsEditModalOpen(true);
+    
+    // Close both sidebars when opening task edit modal
+    closeBothSidebars();
+  };
+
+  const handleAddTaskClick = () => {
+    setIsAddModalOpen(true);
+    
+    // Close both sidebars when opening add task modal
+    closeBothSidebars();
   };
 
   const handleSaveTask = (updatedTask: any) => {
@@ -355,8 +367,8 @@ export default function TaskTracker() {
           taskType: updatedTask.taskType,
           status: updatedTask.status,
           priority: updatedTask.priority,
-          assignedTo: updatedTask.assignedTo._id, // Send user ID, not the full object
-          reporter: updatedTask.reporter._id, // Send user ID, not the full object
+          assignedTo: updatedTask.assignedTo?._id, // Send user ID, not the full object
+          reporter: updatedTask.reporter?._id, // Send user ID, not the full object
           startDate: updatedTask.startDate,
           eta: updatedTask.eta,
           estimatedHours: updatedTask.estimatedHours,
@@ -389,8 +401,7 @@ export default function TaskTracker() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <VerticalLayout>
         <div className="px-6 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8 flex items-center justify-between">
@@ -413,7 +424,7 @@ export default function TaskTracker() {
               </div>
               {canCreateTask() && (
                 <button
-                  onClick={() => setIsAddModalOpen(true)}
+                  onClick={handleAddTaskClick}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
                 >
                   <i className="ri-add-line w-5 h-5"></i>
@@ -457,7 +468,7 @@ export default function TaskTracker() {
                       <p className="text-sm text-gray-500">{activeUser.email}</p>
                     </div>
                     <button
-                      onClick={() => setIsAddModalOpen(true)}
+                      onClick={handleAddTaskClick}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 cursor-pointer whitespace-nowrap flex items-center"
                     >
                       <i className="ri-add-line w-4 h-4 mr-2"></i>
@@ -562,7 +573,13 @@ export default function TaskTracker() {
                           <tr key={task._id || `task-${index}`} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{projectMap[task.projectId] || task.projectId}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {task.projectId 
+                                ? (typeof task.projectId === 'string' 
+                                    ? (projectMap[task.projectId] || task.projectId)
+                                    : task.projectId.title)
+                                : 'No Project'}
+                            </td>
                             <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.description}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -680,7 +697,7 @@ export default function TaskTracker() {
             }}
           />
         )}
-      </div>
+      </VerticalLayout>
     </ProtectedRoute>
   );
 }

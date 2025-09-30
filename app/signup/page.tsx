@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { apiService } from '../../lib/api-service';
+import { useAuth } from '../../lib/contexts/AuthContext';
 import { DEPARTMENTS, ROLES, ROLE_LABELS } from '../../lib/constants';
 
 export default function SignupPage() {
@@ -20,6 +20,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { register } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -60,7 +61,7 @@ export default function SignupPage() {
     }
 
     try {
-      await apiService.register({
+      await register({
         name: formData.name,
         email: formData.email,
         password: formData.password,

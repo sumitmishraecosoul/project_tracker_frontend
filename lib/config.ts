@@ -20,7 +20,7 @@ export const config = {
       return config.api.production;
     }
     
-    // Check if we're in development
+    // Check if we're in development - use localhost since backend is running
     if (process.env.NODE_ENV === 'development') {
       return config.api.development;
     }

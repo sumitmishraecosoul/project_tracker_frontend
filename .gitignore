@@ -3,6 +3,15 @@ node_modules/
 
 # Build output
 /build
+.next/
+out/
+dist/
+node_modules/.cache/
+
+# Next.js build info
+.vercel
+*.tsbuildinfo
+next-env.d.ts
 
 # System files
 .DS_Store

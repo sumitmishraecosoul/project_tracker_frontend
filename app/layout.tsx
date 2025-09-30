@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico } from "next/font/google";
 import "./globals.css";
-import BackendUrlDebug from "../components/BackendUrlDebug";
+import { BrandProvider } from "../components/BrandContext";
+import { BrandUserProvider } from "../components/BrandUserContext";
+import { ProjectProvider } from "../components/ProjectContext";
+import { TaskProvider } from "../components/TaskContext";
+import { SubtaskProvider } from "../components/SubtaskContext";
+import { NotificationProvider } from "../components/NotificationContext";
+import { InvitationProvider } from "../components/InvitationContext";
+import { AuthProvider } from "../lib/contexts/AuthContext";
+import { SidebarProvider } from "../components/SidebarContext";
 
 const pacifico = Pacifico({
   weight: '400',
@@ -35,8 +43,25 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pacifico.variable} antialiased`}
       >
-        {children}
-        <BackendUrlDebug />
+            <AuthProvider>
+              <SidebarProvider>
+                <BrandProvider>
+                  <BrandUserProvider>
+                    <ProjectProvider>
+                      <TaskProvider>
+                        <SubtaskProvider>
+                          <NotificationProvider>
+                            <InvitationProvider>
+                              {children}
+                            </InvitationProvider>
+                          </NotificationProvider>
+                        </SubtaskProvider>
+                      </TaskProvider>
+                    </ProjectProvider>
+                  </BrandUserProvider>
+                </BrandProvider>
+              </SidebarProvider>
+            </AuthProvider>
       </body>
     </html>
   );

@@ -153,7 +153,7 @@ export default function EditUserTaskModal({ task, onSave, onClose }: EditUserTas
     try {
       console.log('Fetching tasks for project:', projectId);
       // Try project-specific endpoint first
-      let data = await apiService.getProjectTasks(projectId);
+      let data = await apiService.getLegacyProjectTasks(projectId);
       console.log('Fetched tasks from project endpoint:', data);
       
       // If no tasks found, try fetching all tasks and filtering
