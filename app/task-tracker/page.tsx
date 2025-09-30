@@ -367,8 +367,8 @@ export default function TaskTracker() {
           taskType: updatedTask.taskType,
           status: updatedTask.status,
           priority: updatedTask.priority,
-          assignedTo: updatedTask.assignedTo._id, // Send user ID, not the full object
-          reporter: updatedTask.reporter._id, // Send user ID, not the full object
+          assignedTo: updatedTask.assignedTo?._id, // Send user ID, not the full object
+          reporter: updatedTask.reporter?._id, // Send user ID, not the full object
           startDate: updatedTask.startDate,
           eta: updatedTask.eta,
           estimatedHours: updatedTask.estimatedHours,

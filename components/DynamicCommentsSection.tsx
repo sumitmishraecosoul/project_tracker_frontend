@@ -364,8 +364,8 @@ const DynamicCommentsSection: React.FC<DynamicCommentsSectionProps> = ({
                     <span className="font-medium text-gray-900">{comment.author.name}</span>
                     <span className="text-xs text-gray-500">
                       {(() => {
-                        // Try different possible date field names
-                        const dateValue = comment.created_at || comment.createdAt || comment.date || comment.timestamp;
+                        // Use the created_at field from Comment interface
+                        const dateValue = comment.created_at;
                         console.log('DynamicCommentsSection - Date formatting for comment:', comment._id, 'dateValue:', dateValue);
                         
                         if (!dateValue) {

@@ -59,7 +59,7 @@ export default function BrandUserManagement({ onClose }: BrandUserManagementProp
   useEffect(() => {
     console.log('BrandUserManagement - brandUsers updated:', {
       count: brandUsers.length,
-      users: brandUsers.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status }))
+      users: brandUsers.map((u: BrandUser) => ({ id: u.id, name: u.name, email: u.email, role: u.role, status: u.status }))
     });
   }, [brandUsers]);
 
