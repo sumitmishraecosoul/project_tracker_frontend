@@ -121,7 +121,25 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
       if (!brandId) {
         throw new Error('No brand selected');
       }
-      const response = await apiService.createBrandSubtask(brandId, data);
+      // Transform the data to match API expectations
+      const apiData = {
+        task_id: data.parentTaskId || '',
+        title: data.task,
+        description: data.description,
+        assignedTo: data.assignedTo,
+        reporter: data.reporter,
+        status: data.status,
+        priority: data.priority,
+        startDate: data.startDate,
+        dueDate: data.dueDate,
+        order: data.order,
+        estimatedHours: data.estimatedHours,
+        labels: data.labels,
+        attachments: data.attachments,
+        relatedSubtasks: data.relatedSubtasks,
+        sprint: data.sprint
+      };
+      const response = await apiService.createBrandSubtask(brandId, apiData);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;
     } catch (err: any) {
@@ -156,7 +174,13 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
       if (!brandId) {
         throw new Error('No brand selected');
       }
-      const response = await apiService.updateBrandSubtask(brandId, subtaskId, data);
+      // Transform the data to match API expectations
+      const apiData: any = { ...data };
+      if (data.task) {
+        apiData.title = data.task;
+        delete apiData.task;
+      }
+      const response = await apiService.updateBrandSubtask(brandId, subtaskId, apiData);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;
     } catch (err: any) {
