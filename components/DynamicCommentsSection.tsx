@@ -36,7 +36,7 @@ const renderTextWithLinks = (text: string) => {
     return <span>{text}</span>;
   }
 
-  let parts = [text];
+  let parts: (string | ReactElement)[] = [text];
   urls.forEach(url => {
     const newParts: (string | ReactElement)[] = [];
     parts.forEach(part => {
