@@ -1316,7 +1316,7 @@ class ApiService {
     assignedTo: string;
     reporter: string;
     status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-    priority?: 'High' | 'Medium' | 'Low';
+    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
     eta: string;
   }) {
     console.log('API Service - createBrandTask called with:', {
@@ -1355,7 +1355,7 @@ class ApiService {
     task?: string;
     description?: string;
     status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-    priority?: 'High' | 'Medium' | 'Low';
+    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
     assignedTo?: string;
     reporter?: string;
     eta?: string;
@@ -1399,7 +1399,7 @@ class ApiService {
   }
 
   // 8. Update Task Priority
-  async updateBrandTaskPriority(brandId: string, taskId: string, priority: 'High' | 'Medium' | 'Low') {
+  async updateBrandTaskPriority(brandId: string, taskId: string, priority: 'Critical' | 'High' | 'Medium' | 'Low') {
     const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/priority`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
