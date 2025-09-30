@@ -218,6 +218,7 @@ export interface UpdateUserRequest {
 
 // Project Management Types
 export interface Project {
+  _id?: string; // MongoDB ID
   id: string;
   title: string;
   description: string;
