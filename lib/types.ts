@@ -41,7 +41,7 @@ export interface Task {
     name: string;
     email: string;
   };
-  projectId?: {
+  projectId?: string | {
     _id: string;
     title: string;
   };
@@ -428,7 +428,7 @@ export interface Subtask {
     name: string;
     email: string;
   };
-  parentTaskId?: {
+  parentTaskId?: string | {
     _id: string;
     task: string;
   };
