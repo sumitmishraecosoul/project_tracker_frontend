@@ -9,20 +9,6 @@ export interface User {
   assignable?: boolean;
 }
 
-export interface Project {
-  _id: string;
-  id: string;
-  title: string;
-  description: string;
-  status: 'Active' | 'Completed' | 'On Hold';
-  createdDate: string;
-  dueDate?: string;
-  priority: string;
-  startDate: string;
-  department?: string;
-  activeMembersCount?: number;
-}
-
 // Phase 5 Task Management Types
 export interface Task {
   _id: string;
