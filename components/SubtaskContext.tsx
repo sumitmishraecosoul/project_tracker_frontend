@@ -130,8 +130,7 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
         reporter: data.reporter,
         status: data.status,
         priority: data.priority,
-        startDate: data.startDate,
-        dueDate: data.dueDate,
+        dueDate: data.dueDate || data.eta, // API uses dueDate, CreateSubtaskData has both
         order: data.order,
         estimatedHours: data.estimatedHours,
         labels: data.labels,
