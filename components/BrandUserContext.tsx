@@ -40,7 +40,7 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
         const users = response.data || [];
         console.log('BrandUserContext - Setting brand users:', users);
         console.log('BrandUserContext - Users count:', users.length);
-        console.log('BrandUserContext - Users details:', users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
+        console.log('BrandUserContext - Users details:', users.map((u: BrandUser) => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
         setBrandUsers(users);
       } else {
         console.error('BrandUserContext - API error:', response.message);
