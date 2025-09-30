@@ -45,8 +45,8 @@ export interface Task {
     _id: string;
     title: string;
   };
-  brand_id: string;
-  createdBy: string;
+  brand_id?: string;
+  createdBy?: string;
   eta?: string;
   createdAt: string;
   updatedAt: string;
@@ -432,8 +432,8 @@ export interface Subtask {
     _id: string;
     task: string;
   };
-  brand_id: string;
-  createdBy: string;
+  brand_id?: string;
+  createdBy?: string;
   eta?: string;
   createdAt: string;
   updatedAt: string;
@@ -505,8 +505,8 @@ export interface SubtaskTemplate {
     estimatedHours?: number;
     order: number;
   }>;
-  brand_id: string;
-  createdBy: string;
+  brand_id?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt: string;
 }
