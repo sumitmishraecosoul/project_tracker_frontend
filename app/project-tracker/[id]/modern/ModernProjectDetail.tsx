@@ -1019,7 +1019,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
             });
           } else {
             console.error('Could not find user by name:', editingSubtaskAssignee);
-            console.log('Available users:', Array.isArray(brandUsers) ? brandUsers.map(u => ({ 
+            console.log('Available users:', Array.isArray(brandUsers) ? brandUsers.map((u: any) => ({ 
               name: u.name, 
               _id: u._id,
               id: u.id,
