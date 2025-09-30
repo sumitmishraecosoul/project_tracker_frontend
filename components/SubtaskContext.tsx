@@ -117,7 +117,11 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.createBrandSubtask(data);
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        throw new Error('No brand selected');
+      }
+      const response = await apiService.createBrandSubtask(brandId, data);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;
     } catch (err: any) {
@@ -148,7 +152,11 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.updateBrandSubtask(subtaskId, data);
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        throw new Error('No brand selected');
+      }
+      const response = await apiService.updateBrandSubtask(brandId, subtaskId, data);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;
     } catch (err: any) {
@@ -164,7 +172,11 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      await apiService.deleteBrandSubtask(subtaskId);
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        throw new Error('No brand selected');
+      }
+      await apiService.deleteBrandSubtask(brandId, subtaskId);
       await getBrandSubtasks(); // Refresh the list
     } catch (err: any) {
       console.error('Error deleting subtask:', err);
