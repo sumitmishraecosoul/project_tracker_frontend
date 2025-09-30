@@ -573,7 +573,13 @@ export default function TaskTracker() {
                           <tr key={task._id || `task-${index}`} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{projectMap[task.projectId] || task.projectId}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {task.projectId 
+                                ? (typeof task.projectId === 'string' 
+                                    ? (projectMap[task.projectId] || task.projectId)
+                                    : task.projectId.title)
+                                : 'No Project'}
+                            </td>
                             <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{task.description}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
