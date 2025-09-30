@@ -3104,7 +3104,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     <div className="flex items-center space-x-2">
                       {brandUsers.length > 0 ? (
                         brandUsers.map((user, index) => {
-                          const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+                          const initials = user.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'U';
                           const colorClasses = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500'];
                           const avatarColor = colorClasses[index % colorClasses.length];
                           
