@@ -266,7 +266,7 @@ export default function Inbox({ onClose }: InboxProps) {
                   
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 text-xs text-gray-500">
-                      <span>From: {notification.sender.name}</span>
+                      <span>From: {notification.from_user.name}</span>
                       <span>•</span>
                       <span>{notification.entity_type}: {notification.entity_name}</span>
                     </div>
