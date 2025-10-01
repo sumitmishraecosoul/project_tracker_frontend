@@ -1583,7 +1583,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                   </div>
                                 </div>
                                 <div className="col-span-2">
-                                  <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                                  </span>
                                 </div>
                                 <div className="col-span-1">
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -1737,7 +1739,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     </div>
                                   </div>
                                   <div className="col-span-2">
-                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                    <span className="text-sm text-gray-900">{task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
                                   </div>
                                   <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -1881,7 +1883,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     </div>
                                   </div>
                                   <div className="col-span-2">
-                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                    <span className="text-sm text-gray-900">{task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
                                   </div>
                                   <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
