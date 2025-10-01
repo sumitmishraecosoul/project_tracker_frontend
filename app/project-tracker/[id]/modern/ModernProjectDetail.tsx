@@ -774,6 +774,15 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     try {
       setIsCreatingSubtask(true);
       
+      // Debug: Check what subtaskAssignee contains
+      console.log('🔍 DEBUG - subtaskAssignee value:', subtaskAssignee);
+      console.log('🔍 DEBUG - subtaskAssignee type:', typeof subtaskAssignee);
+      console.log('🔍 DEBUG - brandUsers:', brandUsers);
+      
+      // Find the selected user to verify
+      const selectedUser = brandUsers.find((u: any) => u._id === subtaskAssignee);
+      console.log('🔍 DEBUG - Selected user object:', selectedUser);
+      
       const subtaskData = {
         task_id: taskId,
         title: subtaskName.trim(),
@@ -787,7 +796,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
         order: (taskSubtasks[taskId]?.length || 0) + 1
       };
       
-      console.log('Creating subtask with data:', { brandId, subtaskData });
+      console.log('📤 SENDING TO API - Full payload:', { brandId, subtaskData });
+      console.log('📤 SENDING TO API - assignedTo value:', subtaskData.assignedTo);
+      console.log('📤 SENDING TO API - assignedTo type:', typeof subtaskData.assignedTo);
+      
       await apiService.createBrandSubtask(brandId, subtaskData);
       await loadTaskSubtasks(taskId);
       
@@ -1571,7 +1583,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                   </div>
                                 </div>
                                 <div className="col-span-2">
-                                  <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                                  </span>
                                 </div>
                                 <div className="col-span-1">
                                   <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -1725,7 +1739,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     </div>
                                   </div>
                                   <div className="col-span-2">
-                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                    <span className="text-sm text-gray-900">{task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
                                   </div>
                                   <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -1869,7 +1883,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                     </div>
                                   </div>
                                   <div className="col-span-2">
-                                    <span className="text-sm text-gray-900">{task.dueDate}</span>
+                                    <span className="text-sm text-gray-900">{task.eta ? new Date(task.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
                                   </div>
                                   <div className="col-span-1">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-purple-100 text-purple-800' : task.priority === 'Medium' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
@@ -2788,7 +2802,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                               >
                                 <option value="">Unassigned</option>
                                 {Array.isArray(brandUsers) && brandUsers.map((user, index) => (
-                                  <option key={user._id || `user-${index}`} value={user._id}>
+                                  <option key={user._id || user.id || `user-${index}`} value={user._id || user.id}>
                                     {user.name}
                                   </option>
                                 ))}
