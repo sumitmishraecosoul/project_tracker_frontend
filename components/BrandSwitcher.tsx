@@ -148,9 +148,10 @@ export default function BrandSwitcher({ className = '' }: BrandSwitcherProps) {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(brand.role)}`}>
                       {brand.role.toUpperCase()}
                     </span>
-                    <span className="text-xs text-gray-500 truncate">
+                    {/* TODO: Pricing/Subscription Feature - Will be implemented later */}
+                    {/* <span className="text-xs text-gray-500 truncate">
                       {brand.subscription?.plan?.toUpperCase() || 'FREE'}
-                    </span>
+                    </span> */}
                   </div>
                 </div>
                 

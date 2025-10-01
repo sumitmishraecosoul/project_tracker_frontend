@@ -133,9 +133,10 @@ export default function VerticalSidebar({
                           <h3 className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
                             {brand.name}
                           </h3>
-                          <p className="text-xs text-gray-500">
+                          {/* TODO: Pricing/Subscription Feature - Will be implemented later */}
+                          {/* <p className="text-xs text-gray-500">
                             {brand.subscription?.plan?.toUpperCase() || 'FREE'} Plan
-                          </p>
+                          </p> */}
                         </div>
                       </>
                     )}
