@@ -364,8 +364,8 @@ const DynamicCommentsSection: React.FC<DynamicCommentsSectionProps> = ({
                     <span className="font-medium text-gray-900">{comment.author.name}</span>
                     <span className="text-xs text-gray-500">
                       {(() => {
-                        // Use the created_at field from Comment interface
-                        const dateValue = comment.created_at;
+                        // Handle both created_at (snake_case from API) and createdAt (camelCase)
+                        const dateValue = (comment as any).created_at || (comment as any).createdAt;
                         console.log('DynamicCommentsSection - Date formatting for comment:', comment._id, 'dateValue:', dateValue);
                         
                         if (!dateValue) {
@@ -386,7 +386,7 @@ const DynamicCommentsSection: React.FC<DynamicCommentsSectionProps> = ({
                         }
                       })()}
                     </span>
-                    {comment.updated_at !== comment.created_at && (
+                    {((comment as any).updated_at || (comment as any).updatedAt) !== ((comment as any).created_at || (comment as any).createdAt) && (
                       <span className="text-xs text-gray-400">(edited)</span>
                     )}
                   </div>

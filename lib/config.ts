@@ -15,18 +15,32 @@ export const config = {
   
   // Get current API URL based on environment
   getApiUrl: () => {
+    let apiUrl: string;
+    
     // Check if we're in production (Vercel or Azure)
     if (process.env.NODE_ENV === 'production') {
-      return config.api.production;
+      apiUrl = config.api.production;
     }
-    
     // Check if we're in development - use localhost since backend is running
-    if (process.env.NODE_ENV === 'development') {
-      return config.api.development;
+    else if (process.env.NODE_ENV === 'development') {
+      apiUrl = config.api.development;
+    }
+    // Check if we're on Vercel (even in preview mode)
+    else if (process.env.VERCEL) {
+      apiUrl = config.api.production;
+    }
+    // Fallback to production for Vercel preview deployments
+    else {
+      apiUrl = config.api.production;
     }
     
-    // Fallback to production for Vercel preview deployments
-    return config.api.production;
+    // Debug logging
+    console.log('🔧 API Configuration Debug:');
+    console.log('  NODE_ENV:', process.env.NODE_ENV);
+    console.log('  VERCEL:', process.env.VERCEL);
+    console.log('  Selected API URL:', apiUrl);
+    
+    return apiUrl;
   },
   
   // App configuration

@@ -186,25 +186,26 @@ export default function BrandManagement({ onClose }: BrandManagementProps) {
     }
   };
 
-  const getSubscriptionBadge = (subscription: any) => {
-    if (!subscription) return null;
-    
-    const plan = subscription.plan || 'free';
-    const status = subscription.status || 'active';
-    
-    return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-        plan === 'free' ? 'text-gray-600 bg-gray-100' :
-        plan === 'pro' ? 'text-blue-600 bg-blue-100' :
-        'text-purple-600 bg-purple-100'
-      }`}>
-        {plan.toUpperCase()}
-        {status !== 'active' && (
-          <span className="ml-1 text-orange-500">• {status}</span>
-        )}
-      </span>
-    );
-  };
+  // TODO: Pricing/Subscription Feature - Will be implemented later
+  // const getSubscriptionBadge = (subscription: any) => {
+  //   if (!subscription) return null;
+  //   
+  //   const plan = subscription.plan || 'free';
+  //   const status = subscription.status || 'active';
+  //   
+  //   return (
+  //     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+  //       plan === 'free' ? 'text-gray-600 bg-gray-100' :
+  //       plan === 'pro' ? 'text-blue-600 bg-blue-100' :
+  //       'text-purple-600 bg-purple-100'
+  //     }`}>
+  //       {plan.toUpperCase()}
+  //       {status !== 'active' && (
+  //         <span className="ml-1 text-orange-500">• {status}</span>
+  //       )}
+  //     </span>
+  //   );
+  // };
 
   if (isLoading) {
     return (
@@ -254,7 +255,8 @@ export default function BrandManagement({ onClose }: BrandManagementProps) {
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(currentBrand.role)}`}>
                 {currentBrand.role.toUpperCase()}
               </span>
-              {getSubscriptionBadge(currentBrand.subscription)}
+              {/* TODO: Pricing/Subscription Feature - Will be implemented later */}
+              {/* {getSubscriptionBadge(currentBrand.subscription)} */}
             </div>
           </div>
         </div>
@@ -358,7 +360,8 @@ export default function BrandManagement({ onClose }: BrandManagementProps) {
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(brand.role)}`}>
                             {brand.role.toUpperCase()}
                           </span>
-                          {getSubscriptionBadge(brand.subscription)}
+                          {/* TODO: Pricing/Subscription Feature - Will be implemented later */}
+                          {/* {getSubscriptionBadge(brand.subscription)} */}
                           {currentBrand?.id === brand.id && (
                             <span className="px-2 py-1 rounded-full text-xs font-medium text-blue-600 bg-blue-100">
                               ACTIVE

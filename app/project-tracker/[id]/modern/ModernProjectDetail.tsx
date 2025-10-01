@@ -101,31 +101,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const [loadingBrandUsers, setLoadingBrandUsers] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
 
-  // Mock assignee data
-  const mockAssignees = [
-    {
-      id: '1',
-      name: 'SM Sumit Mishra',
-      email: 'sumitmishraecosoul@gmail.com',
-      avatar: 'SM',
-      color: 'blue'
-    },
-    {
-      id: '2', 
-      name: 'SS sumitmishra.sm004',
-      email: 'sumitmishra.sm004@gmail.com',
-      avatar: 'SS',
-      color: 'yellow'
-    },
-    {
-      id: '3',
-      name: 'SS sumitmishra.sm04',
-      email: 'sumitmishra.sm04@gmail.com', 
-      avatar: 'SS',
-      color: 'green'
-    }
-  ];
-
   // Mock data for demonstration - replace with actual API calls
   const mockTasks = [
     {
@@ -654,20 +629,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
   const handleCreateTask = async () => {
     console.log('handleCreateTask called', { newTaskName, currentBrand, isCreatingTask });
-    
-    // Test backend connection first
-    try {
-      const testResponse = await fetch('http://localhost:5000/api/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Backend connection test:', testResponse.status);
-    } catch (error) {
-      console.error('Backend connection failed:', error);
-      alert('Backend server is not running on port 5000. Please start the backend server.');
-      return;
-    }
     
     if (newTaskName.trim() && currentBrand && !isCreatingTask) {
       setIsCreatingTask(true);
@@ -2826,9 +2787,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                                 disabled={isCreatingSubtask}
                               >
                                 <option value="">Unassigned</option>
-                                {mockAssignees.map((assignee) => (
-                                  <option key={assignee.id} value={assignee.id}>
-                                    {assignee.name}
+                                {Array.isArray(brandUsers) && brandUsers.map((user, index) => (
+                                  <option key={user._id || `user-${index}`} value={user._id}>
+                                    {user.name}
                                   </option>
                                 ))}
                               </select>

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useBrand } from './BrandContext';
 import { useBrandUser } from './BrandUserContext';
 import { BrandUser, InviteUserRequest, AddUserRequest, UpdateUserRequest } from '../lib/types';
+import { config } from '../lib/config';
 
 interface BrandUserManagementProps {
   onClose?: () => void;
@@ -252,61 +253,6 @@ export default function BrandUserManagement({ onClose }: BrandUserManagementProp
           }`}
         >
           Users ({brandUsers.length})
-        </button>
-        <button
-          onClick={() => {
-            if (currentBrand?.id) {
-              console.log('Manual refresh triggered');
-              getBrandUsers(currentBrand.id);
-            }
-          }}
-          className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-          title="Refresh user list"
-        >
-          🔄 Refresh
-        </button>
-        <button
-          onClick={async () => {
-            if (currentBrand?.id) {
-              console.log('=== DIRECT API TEST ===');
-              try {
-                const response = await fetch(`http://localhost:5000/api/brands/${currentBrand.id}/users`, {
-                  headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                const data = await response.json();
-                console.log('Direct API response:', data);
-                console.log('Direct API users count:', data.data?.length || 0);
-                console.log('Direct API users:', data.data);
-              } catch (error) {
-                console.error('Direct API test error:', error);
-              }
-              console.log('=== END DIRECT API TEST ===');
-            }
-          }}
-          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-          title="Test API directly"
-        >
-          🧪 Test API
-        </button>
-        <button
-          onClick={async () => {
-            if (currentBrand?.id) {
-              console.log('=== BACKEND ISSUE CONFIRMED ===');
-              console.log('The backend API is only returning 1 user (the brand owner)');
-              console.log('This means the backend database query is not including invited users');
-              console.log('SOLUTION: The backend needs to be fixed to query ALL users associated with the brand');
-              console.log('Current API returns:', brandUsers.length, 'users');
-              console.log('Expected: Should return all invited users + brand owner');
-              console.log('=== END BACKEND ISSUE CONFIRMED ===');
-            }
-          }}
-          className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-          title="Confirm backend issue"
-        >
-          🚨 Backend Issue
         </button>
         <button
           onClick={() => setActiveTab('invite')}
