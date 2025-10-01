@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useBrand } from './BrandContext';
 import { useBrandUser } from './BrandUserContext';
 import { BrandUser, InviteUserRequest, AddUserRequest, UpdateUserRequest } from '../lib/types';
+import { config } from '../lib/config';
 
 interface BrandUserManagementProps {
   onClose?: () => void;
@@ -270,7 +271,8 @@ export default function BrandUserManagement({ onClose }: BrandUserManagementProp
             if (currentBrand?.id) {
               console.log('=== DIRECT API TEST ===');
               try {
-                const response = await fetch(`http://localhost:5000/api/brands/${currentBrand.id}/users`, {
+                const apiUrl = config.getApiUrl();
+                const response = await fetch(`${apiUrl}/api/brands/${currentBrand.id}/users`, {
                   headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'

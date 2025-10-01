@@ -655,20 +655,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const handleCreateTask = async () => {
     console.log('handleCreateTask called', { newTaskName, currentBrand, isCreatingTask });
     
-    // Test backend connection first
-    try {
-      const testResponse = await fetch('http://localhost:5000/api/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      console.log('Backend connection test:', testResponse.status);
-    } catch (error) {
-      console.error('Backend connection failed:', error);
-      alert('Backend server is not running on port 5000. Please start the backend server.');
-      return;
-    }
-    
     if (newTaskName.trim() && currentBrand && !isCreatingTask) {
       setIsCreatingTask(true);
       try {
