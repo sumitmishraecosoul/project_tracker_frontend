@@ -774,6 +774,15 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     try {
       setIsCreatingSubtask(true);
       
+      // Debug: Check what subtaskAssignee contains
+      console.log('🔍 DEBUG - subtaskAssignee value:', subtaskAssignee);
+      console.log('🔍 DEBUG - subtaskAssignee type:', typeof subtaskAssignee);
+      console.log('🔍 DEBUG - brandUsers:', brandUsers);
+      
+      // Find the selected user to verify
+      const selectedUser = brandUsers.find((u: any) => u._id === subtaskAssignee);
+      console.log('🔍 DEBUG - Selected user object:', selectedUser);
+      
       const subtaskData = {
         task_id: taskId,
         title: subtaskName.trim(),
@@ -787,7 +796,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
         order: (taskSubtasks[taskId]?.length || 0) + 1
       };
       
-      console.log('Creating subtask with data:', { brandId, subtaskData });
+      console.log('📤 SENDING TO API - Full payload:', { brandId, subtaskData });
+      console.log('📤 SENDING TO API - assignedTo value:', subtaskData.assignedTo);
+      console.log('📤 SENDING TO API - assignedTo type:', typeof subtaskData.assignedTo);
+      
       await apiService.createBrandSubtask(brandId, subtaskData);
       await loadTaskSubtasks(taskId);
       
@@ -2788,7 +2800,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                               >
                                 <option value="">Unassigned</option>
                                 {Array.isArray(brandUsers) && brandUsers.map((user, index) => (
-                                  <option key={user._id || `user-${index}`} value={user._id}>
+                                  <option key={user._id || user.id || `user-${index}`} value={user._id || user.id}>
                                     {user.name}
                                   </option>
                                 ))}
