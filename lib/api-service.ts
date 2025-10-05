@@ -9,12 +9,21 @@ const devLog = (...args: any[]) => {
   }
 };
 
-// Helper function for development-only error logging
+  // Helper function for development-only error logging
 const devError = (...args: any[]) => {
   if (config.features.enableDebugLogging) {
     console.error(...args);
   }
 };
+
+interface Category {
+  _id: string;
+  name: string;
+  color: string;
+  description?: string;
+  is_default: boolean;
+  order: number;
+}
 
 interface User {
   _id: string;
@@ -150,14 +159,6 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  async login(credentials: { email: string; password: string }) {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
-    });
-    return this.handleResponse(response);
-  }
 
   async getProfile() {
     const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
@@ -1308,39 +1309,6 @@ class ApiService {
     return this.handleResponse(response);
   }
 
-  // 2. Create Brand Task
-  async createBrandTask(brandId: string, taskData: {
-    task: string;
-    description?: string;
-    projectId: string;
-    assignedTo: string;
-    reporter: string;
-    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
-    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
-    eta: string;
-  }) {
-    console.log('API Service - createBrandTask called with:', {
-      brandId,
-      taskData,
-      url: `${API_BASE_URL}/api/brands/${brandId}/tasks`,
-      headers: this.getAuthHeader()
-    });
-    
-    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks`, {
-      method: 'POST',
-      headers: this.getAuthHeader(),
-      body: JSON.stringify(taskData)
-    });
-    
-    console.log('API Service - createBrandTask response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-    
-    return this.handleResponse(response);
-  }
 
   // 3. Get Brand Task by ID
   async getBrandTaskById(brandId: string, taskId: string) {
@@ -1776,6 +1744,193 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // ========================================
+  // CATEGORY MANAGEMENT APIs
+  // ========================================
+
+  // 1. Get Project Categories
+  async getProjectCategories(brandId: string, projectId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories`, {
+      method: 'GET',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 2. Get Single Category
+  async getCategoryById(brandId: string, projectId: string, categoryId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories/${categoryId}`, {
+      method: 'GET',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 3. Create Category
+  async createCategory(brandId: string, projectId: string, categoryData: {
+    name: string;
+    description?: string;
+    color?: string;
+    order?: number;
+    is_default?: boolean;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(categoryData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 4. Update Category
+  async updateCategory(brandId: string, projectId: string, categoryId: string, categoryData: {
+    name?: string;
+    description?: string;
+    color?: string;
+    order?: number;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories/${categoryId}`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(categoryData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // 5. Delete Category
+  async deleteCategory(brandId: string, projectId: string, categoryId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories/${categoryId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // 6. Reorder Categories
+  async reorderCategories(brandId: string, projectId: string, categoryOrders: Array<{category_id: string, order: number}>) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories/reorder`, {
+      method: 'PUT',
+      headers: {
+        ...this.getAuthHeader(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ category_orders: categoryOrders })
+    });
+    return this.handleResponse(response);
+  }
+
+  // 7. Get Tasks in Category
+  async getCategoryTasks(brandId: string, projectId: string, categoryId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/projects/${projectId}/categories/${categoryId}/tasks`, {
+      method: 'GET',
+      headers: this.getAuthHeader()
+    });
+    return this.handleResponse(response);
+  }
+
+  // Create Default Categories
+  async createDefaultCategories(brandId: string, projectId: string) {
+    const defaultCategories = [
+      { name: 'Operations', color: '#3B82F6', description: 'Operations tasks', is_default: true, order: 1 },
+      { name: 'Ads', color: '#10B981', description: 'Advertising tasks', is_default: true, order: 2 },
+      { name: 'Supply Chain', color: '#F59E0B', description: 'Supply chain tasks', is_default: true, order: 3 },
+      { name: 'Design', color: '#8B5CF6', description: 'Design tasks', is_default: true, order: 4 },
+      { name: 'Misc', color: '#6B7280', description: 'Miscellaneous tasks', is_default: true, order: 5 }
+    ];
+    
+    const results = [];
+    for (const category of defaultCategories) {
+      try {
+        const response = await this.createCategory(brandId, projectId, category);
+        results.push(response);
+      } catch (error) {
+        console.error('Error creating default category:', error);
+      }
+    }
+    return results;
+  }
+
+
+  // ========================================
+  // UPDATED AUTHENTICATION APIs
+  // ========================================
+
+  // Updated register method with new role system
+  async signup(userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: 'admin' | 'brand_admin' | 'user';
+    employeeNumber?: string;
+    department?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    return this.handleResponse(response);
+  }
+
+  // Updated login method
+  async login(credentials: { 
+    email: string; 
+    password: string;
+    currentBrandId?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    return this.handleResponse(response);
+  }
+
+  // ========================================
+  // UPDATED TASK MANAGEMENT APIs
+  // ========================================
+
+  // Updated createBrandTask to require category_id
+  async createBrandTask(brandId: string, taskData: {
+    task: string;
+    description?: string;
+    projectId: string;
+    category_id: string; // NEW: Required field
+    assignedTo: string;
+    reporter: string;
+    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+    priority?: 'Critical' | 'High' | 'Medium' | 'Low';
+    eta: string;
+  }) {
+    console.log('API Service - createBrandTask called with:', {
+      brandId,
+      taskData,
+      url: `${API_BASE_URL}/api/brands/${brandId}/tasks`,
+      headers: this.getAuthHeader()
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks`, {
+      method: 'POST',
+      headers: this.getAuthHeader(),
+      body: JSON.stringify(taskData)
+    });
+    
+    console.log('API Service - createBrandTask response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    return this.handleResponse(response);
+  }
+
   // Phase 6: Comments & Activities APIs
   async getBrandComments(brandId: string, params?: {
     page?: number;
@@ -1877,6 +2032,7 @@ class ApiService {
 
     return this.handleResponse(response);
   }
+
 }
 
 export const apiService = new ApiService();

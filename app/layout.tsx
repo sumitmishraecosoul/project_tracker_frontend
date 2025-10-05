@@ -10,6 +10,7 @@ import { NotificationProvider } from "../components/NotificationContext";
 import { InvitationProvider } from "../components/InvitationContext";
 import { AuthProvider } from "../lib/contexts/AuthContext";
 import { SidebarProvider } from "../components/SidebarContext";
+import { CategoryProvider } from "../components/CategoryContext";
 
 const pacifico = Pacifico({
   weight: '400',
@@ -50,11 +51,13 @@ export default function RootLayout({
                     <ProjectProvider>
                       <TaskProvider>
                         <SubtaskProvider>
-                          <NotificationProvider>
-                            <InvitationProvider>
-                              {children}
-                            </InvitationProvider>
-                          </NotificationProvider>
+                          <CategoryProvider>
+                            <NotificationProvider>
+                              <InvitationProvider>
+                                {children}
+                              </InvitationProvider>
+                            </NotificationProvider>
+                          </CategoryProvider>
                         </SubtaskProvider>
                       </TaskProvider>
                     </ProjectProvider>

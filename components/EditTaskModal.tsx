@@ -52,13 +52,19 @@ export default function EditTaskModal({ task, onSave, onClose }: EditTaskModalPr
     try {
       // Use the new RBAC helper endpoint for assignable users
       const data = await apiService.getAssignableUsers();
-      setUsers(data);
+      setUsers(data.map((user: any) => ({
+        ...user,
+        role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+      })));
     } catch (error) {
       console.error('Failed to fetch assignable users:', error);
       // Fallback to regular users endpoint if helper fails
       try {
         const fallbackData = await apiService.getUsers();
-        setUsers(fallbackData);
+        setUsers(fallbackData.map((user: any) => ({
+          ...user,
+          role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+        })));
       } catch (fallbackError) {
         console.error('Failed to fetch users (fallback):', fallbackError);
         setUsers([]);

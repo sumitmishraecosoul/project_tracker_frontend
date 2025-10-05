@@ -1,4 +1,4 @@
-import ModernProjectDetail from './ModernProjectDetail';
+import ModernProjectDetail from './ModernProjectDetailNew';
 
 export async function generateStaticParams() {
   return [

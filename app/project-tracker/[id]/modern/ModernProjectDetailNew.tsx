@@ -1,0 +1,578 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import VerticalLayout from '../../../../components/VerticalLayout';
+import { apiService } from '../../../../lib/api-service';
+import { Project, Task, CreateTaskData } from '../../../../lib/types';
+import { useTasks } from '../../../../components/TaskContext';
+import { useProjects } from '../../../../components/ProjectContext';
+import { useBrand } from '../../../../components/BrandContext';
+import { useSubtasks } from '../../../../components/SubtaskContext';
+import { useSidebar } from '../../../../components/SidebarContext';
+import { CategoryProvider } from '../../../../components/CategoryContext';
+import CategoryTaskSections from '../../../../components/CategoryTaskSections';
+import TaskDetailsPanel from '../../../../components/TaskDetailsPanel';
+
+interface ModernProjectDetailProps {
+  projectId: string;
+  selectedBrand?: { id: string; name: string } | null;
+}
+
+export default function ModernProjectDetail({ projectId, selectedBrand = null }: ModernProjectDetailProps) {
+  // Context hooks
+  const { tasks, loading: tasksLoading, getProjectTasks, createTask, updateTask, updateTaskStatus } = useTasks();
+  const { projects, getProjectDetails, currentProject } = useProjects();
+  const { currentBrand, isLoading: brandLoading } = useBrand();
+  const { subtasks, getTaskSubtasks, createSubtask, updateSubtaskStatus: updateSubtaskStatusContext } = useSubtasks();
+  const { closeBothSidebars } = useSidebar();
+  // Remove old category context usage
+  
+  // Local state
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // Task management state
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<{ [taskId: string]: boolean }>({});
+  const [newSubtaskName, setNewSubtaskName] = useState('');
+  const [showNewTaskInput, setShowNewTaskInput] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [selectedCategoryForTask, setSelectedCategoryForTask] = useState<string>('');
+  
+  // Category state removed - now handled by CategoryProvider
+  
+  // User management
+  const [users, setUsers] = useState<any[]>([]);
+
+  // Memoize CategoryProvider props to prevent unnecessary re-renders
+  const categoryProviderProps = useMemo(() => ({
+    brandId: currentBrand?.id || '',
+    projectId
+  }), [currentBrand?.id, projectId]);
+
+  // Load data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(''); // Clear any previous errors
+        
+        console.log('ModernProjectDetail: Loading data with', { 
+          projectId, 
+          currentBrandId: currentBrand?.id, 
+          hasCurrentBrand: !!currentBrand,
+          currentBrandName: currentBrand?.name
+        });
+        
+        // Load project details
+        if (projectId && currentBrand) {
+          try {
+            const projectData = await getProjectDetails(currentBrand.id, projectId);
+            setProject(projectData);
+          } catch (projectError) {
+            console.error('Error loading project:', projectError);
+            // Don't fail the entire page if project details fail
+            // Just log the error and continue
+          }
+        }
+
+        // Load project tasks
+        if (projectId && currentBrand) {
+          try {
+            await getProjectTasks(currentBrand.id, projectId);
+            console.log('Loaded project tasks');
+          } catch (taskError) {
+            console.error('Error loading project tasks:', taskError);
+            // Don't fail the entire page if tasks fail
+          }
+        }
+
+        // Categories are now loaded by CategoryProvider
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Don't set error state - let the page load anyway
+        // setError('Failed to load project data');
+      } finally {
+        // Always set loading to false so the page can render
+        setLoading(false);
+        console.log('ModernProjectDetail: Loading complete');
+      }
+    };
+
+    loadData();
+  }, [projectId, currentBrand]);
+
+  // Helper functions
+
+  const handleTaskSelect = (task: any) => {
+    setSelectedTask(task);
+    setShowTaskDetails(true);
+  };
+
+  const handleAddTask = (categoryId: string) => {
+    setSelectedCategoryForTask(categoryId);
+    setShowNewTaskInput(true);
+    setNewTaskName('');
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskName.trim() || isCreatingTask || !selectedCategoryForTask || !currentBrand) return;
+
+    try {
+      setIsCreatingTask(true);
+      
+      // Get current user ID for assignedTo and reporter
+      const currentUser = localStorage.getItem('currentUser');
+      const userData = currentUser ? JSON.parse(currentUser) : null;
+      const userId = userData?.id || currentBrand?.id || '';
+      
+          const taskData = {
+            task: newTaskName.trim(),
+            description: '',
+            projectId: projectId,
+            assignedTo: userId,
+            reporter: userId,
+            eta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+            status: 'Yet to Start',
+            priority: 'Medium',
+            category_id: selectedCategoryForTask
+          };
+
+      await createTask(currentBrand.id, taskData);
+      setNewTaskName('');
+      setShowNewTaskInput(false);
+      setSelectedCategoryForTask('');
+    } catch (error) {
+      console.error('Error creating task:', error);
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
+
+  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+    try {
+      await updateTaskStatus(taskId, newStatus);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
+  const handleTaskCheckboxClick = async (task: any) => {
+    const newStatus = task.status === 'Completed' ? 'Yet to Start' : 'Completed';
+    await handleTaskStatusChange(task._id, newStatus);
+  };
+
+  const toggleTaskExpansion = (taskId: string) => {
+    setExpandedTasks(prev => ({
+      ...prev,
+      [taskId]: !prev[taskId]
+    }));
+  };
+
+  const getAssigneeAvatar = (task: any) => {
+    if (task.assignedTo?.avatar) {
+      return (
+        <img 
+          src={task.assignedTo.avatar} 
+          alt={task.assignedTo.name} 
+          className="w-6 h-6 rounded-full"
+        />
+      );
+    }
+    return (
+      <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+        <i className="ri-user-line text-xs text-gray-400"></i>
+      </div>
+    );
+  };
+
+  const handleSubtaskCheckboxClick = async (taskId: string, subtaskId: string) => {
+    try {
+      await updateSubtaskStatusContext(taskId, subtaskId);
+    } catch (error) {
+      console.error('Error updating subtask status:', error);
+    }
+  };
+
+  const handleCreateSubtask = async (taskId: string) => {
+    if (!newSubtaskName.trim()) return;
+    
+    try {
+      await createSubtask(taskId, newSubtaskName.trim());
+      setNewSubtaskName('');
+    } catch (error) {
+      console.error('Error creating subtask:', error);
+    }
+  };
+
+
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+    
+    try {
+      await updateTask(selectedTask._id, selectedTask);
+      setShowTaskDetails(false);
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  const handleTaskChange = (field: string, value: any) => {
+    setSelectedTask((prev: any) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+
+  console.log('ModernProjectDetail: Loading state check', { 
+    loading, 
+    brandLoading, 
+    currentBrand: !!currentBrand,
+    currentBrandId: currentBrand?.id 
+  });
+
+  // Loading state
+  if (loading || brandLoading) {
+    return (
+      <VerticalLayout>
+        <div className="h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="ml-3 text-gray-600">
+            {brandLoading ? 'Loading brand...' : 'Loading project...'}
+          </p>
+        </div>
+      </VerticalLayout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <VerticalLayout>
+        <div className="h-screen flex items-center justify-center">
+          <p className="text-red-600">{error}</p>
+        </div>
+      </VerticalLayout>
+    );
+  }
+
+  // No brand selected
+  if (!currentBrand) {
+    return (
+      <VerticalLayout>
+        <div className="h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">No brand selected</p>
+            <p className="text-sm text-gray-500">Please select a brand to view this project.</p>
+          </div>
+        </div>
+      </VerticalLayout>
+    );
+  }
+
+  console.log('ModernProjectDetail: About to render CategoryProvider with', {
+    brandId: currentBrand?.id,
+    projectId,
+    currentBrandName: currentBrand?.name
+  });
+
+  return (
+    <VerticalLayout>
+      <CategoryProvider {...categoryProviderProps}>
+        <div className="h-screen bg-gray-50 flex flex-col">
+        {/* Top Navigation Bar */}
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button className="p-2 text-gray-600 hover:text-gray-800">
+              <i className="ri-menu-line text-lg"></i>
+            </button>
+            <button className="px-3 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 flex items-center space-x-1">
+              <i className="ri-add-line text-sm"></i>
+              <span>Create</span>
+            </button>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Q Search"
+                className="w-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button className="p-2 text-gray-600 hover:text-gray-800">
+              <i className="ri-question-line text-lg"></i>
+            </button>
+            <button className="p-2 text-gray-600 hover:text-gray-800">
+              <i className="ri-flashlight-line text-lg"></i>
+            </button>
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              SM
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex">
+          {/* Task Management Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Project Header */}
+            <div className="bg-white border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                      SM
+                    </div>
+                    <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
+                      <i className="ri-user-line text-xs text-gray-600"></i>
+                    </div>
+                    <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
+                      <i className="ri-user-line text-xs text-gray-600"></i>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button className="p-1 text-gray-400 hover:text-gray-600">
+                      <i className="ri-more-2-line text-sm"></i>
+                    </button>
+                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded">
+                      Share
+                    </button>
+                    <button className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded">
+                      Customize
+                    </button>
+                    <select className="px-3 py-1 text-sm text-gray-600 border border-gray-300 rounded">
+                      <option>Set status</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500">
+                  {project ? project.name : `Project ${projectId}`}
+                </div>
+              </div>
+            </div>
+
+            {/* View Tabs */}
+            <div className="bg-white border-b border-gray-200 px-6">
+              <div className="flex space-x-6">
+                <button className="py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+                  List
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Board
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Timeline
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Dashboard
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Calendar
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Workflow
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Messages
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Files
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800">
+                  Gantt
+                </button>
+                <button className="py-3 text-sm font-medium text-gray-600 hover:text-gray-800 flex items-center space-x-1">
+                  <span>Categories</span>
+                  <i className="ri-add-line text-xs"></i>
+                </button>
+              </div>
+            </div>
+
+            {/* Task Actions */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <button 
+                    onClick={() => {
+                      // For now, we'll disable this button since tasks should be added to specific categories
+                      // Users should use the "Add task..." buttons in each category section
+                      alert('Please use the "Add task..." button in a specific category section');
+                    }}
+                    className="px-4 py-2 bg-gray-400 text-white text-sm rounded cursor-not-allowed flex items-center space-x-2"
+                    disabled
+                  >
+                    <i className="ri-add-line text-sm"></i>
+                    <span>Add task (use category sections below)</span>
+                  </button>
+                  <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
+                    <i className="ri-filter-line text-sm"></i>
+                    <span>Filter</span>
+                  </button>
+                  <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
+                    <i className="ri-sort-desc text-sm"></i>
+                    <span>Sort</span>
+                  </button>
+                  <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
+                    <i className="ri-layout-grid-line text-sm"></i>
+                    <span>Group</span>
+                  </button>
+                  <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
+                    <i className="ri-settings-3-line text-sm"></i>
+                    <span>Options</span>
+                  </button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button className="p-2 text-gray-400 hover:text-gray-600">
+                    <i className="ri-search-line text-sm"></i>
+                  </button>
+                  <button className="p-2 text-gray-400 hover:text-gray-600">
+                    <i className="ri-question-line text-sm"></i>
+                  </button>
+                  <button className="p-2 text-gray-400 hover:text-gray-600">
+                    <i className="ri-user-line text-sm"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Task Header */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3">
+              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <div className="col-span-1">Check</div>
+                <div className="col-span-4">Name</div>
+                <div className="col-span-2">Assignee</div>
+                <div className="col-span-2">Due Date</div>
+                <div className="col-span-1">Priority</div>
+                <div className="col-span-2 text-center">Status</div>
+              </div>
+            </div>
+
+
+                  {/* Debug Info */}
+                  <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 text-xs text-yellow-800">
+                    Debug: Tasks: {tasks?.length || 0}, Loading: {loading ? 'Yes' : 'No'}, Brand Loading: {brandLoading ? 'Yes' : 'No'}, Brand: {currentBrand?.id || 'None'}, Project: {projectId}
+                    <br />
+                    Brand Details: {currentBrand ? JSON.stringify(currentBrand, null, 2) : 'No brand'}
+                  </div>
+
+            {/* Task Input Field */}
+            {showNewTaskInput && (
+              <div className="bg-blue-50 border-b border-blue-200 px-6 py-4">
+                <div className="grid grid-cols-12 gap-4 items-center">
+                  <div className="col-span-1">
+                    <button className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400">
+                      <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                    </button>
+                  </div>
+                  <div className="col-span-4">
+                    <input
+                      type="text"
+                      placeholder={isCreatingTask ? "Creating task..." : "Write a task name"}
+                      value={newTaskName}
+                      onChange={(e) => setNewTaskName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !isCreatingTask) {
+                          handleCreateTask();
+                        }
+                      }}
+                      className="w-full px-2 py-1 border-0 focus:outline-none text-sm placeholder-gray-400 bg-transparent"
+                      autoFocus
+                      disabled={isCreatingTask}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <button 
+                      onClick={handleCreateTask}
+                      disabled={!newTaskName.trim() || isCreatingTask}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {isCreatingTask ? (
+                        <>
+                          <i className="ri-loader-4-line animate-spin text-xs"></i>
+                          <span>Creating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="ri-check-line text-xs"></i>
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="col-span-2">
+                    <button className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center hover:border-gray-400">
+                      <i className="ri-user-line text-xs text-gray-400"></i>
+                    </button>
+                  </div>
+                  <div className="col-span-2">
+                    <button className="p-1 text-gray-400 hover:text-gray-600">
+                      <i className="ri-calendar-line text-sm"></i>
+                    </button>
+                  </div>
+                  <div className="col-span-1">
+                    <button
+                      onClick={() => {
+                        if (!isCreatingTask) {
+                          setShowNewTaskInput(false);
+                          setNewTaskName('');
+                          setSelectedCategoryForTask('');
+                        }
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                      disabled={isCreatingTask}
+                    >
+                      {isCreatingTask ? (
+                        <i className="ri-loader-4-line animate-spin text-sm"></i>
+                      ) : (
+                        <i className="ri-close-line text-sm"></i>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Category Task Sections */}
+            {currentBrand ? (
+              <CategoryTaskSections
+                onTaskSelect={handleTaskSelect}
+                selectedTask={selectedTask}
+                onAddTask={handleAddTask}
+                onTaskStatusChange={handleTaskStatusChange}
+                onTaskCheckboxClick={handleTaskCheckboxClick}
+                expandedTasks={expandedTasks}
+                toggleTaskExpansion={toggleTaskExpansion}
+                taskSubtasks={subtasks}
+                getAssigneeAvatar={getAssigneeAvatar}
+              />
+            ) : (
+              <div className="bg-white p-6 text-center">
+                <p className="text-gray-600 mb-4">No brand selected. Please select a brand to view categories.</p>
+                <p className="text-sm text-gray-500">Current Brand: {currentBrand ? currentBrand.id : 'None'}</p>
+              </div>
+            )}
+          </div>
+
+                {/* Task Details Panel */}
+                <TaskDetailsPanel
+                  showTaskDetails={showTaskDetails}
+                  selectedTask={selectedTask}
+                  users={users}
+                  onClose={() => setShowTaskDetails(false)}
+                  onUpdateTask={handleUpdateTask}
+                  onTaskChange={handleTaskChange}
+                  currentBrand={currentBrand}
+                  projectId={projectId}
+                />
+        </div>
+      </div>
+      </CategoryProvider>
+    </VerticalLayout>
+  );
+}

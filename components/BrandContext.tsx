@@ -35,6 +35,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
   const initializeBrands = async () => {
     try {
+      console.log('BrandContext: Starting brand initialization');
       setIsLoading(true);
       setError(null);
       
@@ -43,20 +44,26 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       
       // Load current brand from localStorage
       const savedCurrentBrand = localStorage.getItem('currentBrand');
+      console.log('BrandContext: Saved current brand from localStorage:', savedCurrentBrand);
       if (savedCurrentBrand) {
         try {
           const brand = JSON.parse(savedCurrentBrand);
+          console.log('BrandContext: Parsed brand:', brand);
           setCurrentBrand(brand);
           setSelectedBrand(brand); // Set as selected for UI compatibility
+          console.log('BrandContext: Set current brand to:', brand);
         } catch (parseError) {
           console.error('Error parsing saved current brand:', parseError);
           localStorage.removeItem('currentBrand');
         }
+      } else {
+        console.log('BrandContext: No saved current brand found');
       }
     } catch (error) {
       console.error('Error initializing brands:', error);
       setError('Failed to load brands');
     } finally {
+      console.log('BrandContext: Brand initialization complete, setting isLoading to false');
       setIsLoading(false);
     }
   };

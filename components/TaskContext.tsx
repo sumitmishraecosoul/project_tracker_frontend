@@ -112,7 +112,16 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       console.log('TaskContext - Create task response:', response);
       
       if (response.success && response.data) {
-        const newTask = response.data.task;
+        // For task creation, the task is directly in response.data
+        const newTask = response.data;
+        console.log('TaskContext - New task data:', newTask);
+        console.log('TaskContext - New task properties:', {
+          id: newTask._id,
+          task: newTask.task,
+          category_id: newTask.category_id,
+          brand_id: newTask.brand_id,
+          projectId: newTask.projectId
+        });
         setTasks(prev => [...prev, newTask]);
         console.log('TaskContext - Added new task to list:', newTask);
         return newTask;

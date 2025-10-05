@@ -4,7 +4,7 @@ export interface User {
   name: string;
   email: string;
   employeeNumber?: string;
-  role?: string;
+  role?: 'admin' | 'brand_admin' | 'user'; // Updated to 3 roles
   department?: string;
   assignable?: boolean;
 }
@@ -15,6 +15,7 @@ export interface Task {
   id: string;
   task: string;
   description?: string;
+  category_id: string; // NEW: Required field for category
   status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: {
@@ -137,6 +138,7 @@ export interface Brand {
   updated_at?: string;
   user_role?: string;
   user_permissions?: BrandPermissions;
+  is_global_admin?: boolean; // NEW: For admin role visibility
 }
 
 export interface CreateBrandData {
@@ -343,6 +345,7 @@ export interface CreateTaskData {
   task: string;
   description?: string;
   projectId: string;
+  category_id: string; // NEW: Required field for category
   assignedTo: string;
   reporter: string;
   status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
@@ -563,4 +566,91 @@ export interface ReorderSubtasksRequest {
 export interface ApplyTemplateRequest {
   templateId: string;
   parentTaskId: string;
+}
+
+// ========================================
+// CATEGORY SYSTEM TYPES
+// ========================================
+
+export interface Category {
+  _id: string;
+  name: string;
+  description?: string;
+  color: string;
+  order: number;
+  is_default: boolean;
+  project_id: string;
+  brand_id: string;
+  created_by: string;
+  taskCount?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCategoryData {
+  name: string;
+  description?: string;
+  color?: string;
+  order?: number;
+}
+
+export interface UpdateCategoryData {
+  name?: string;
+  description?: string;
+  color?: string;
+  order?: number;
+}
+
+export interface CategoryResponse {
+  success: boolean;
+  data: Category | Category[];
+  message: string;
+}
+
+export interface CategoryReorderRequest {
+  categoryOrders: Array<{
+    categoryId: string;
+    order: number;
+  }>;
+}
+
+export interface CategoryWithTasks {
+  category: Category;
+  tasks: Task[];
+  taskCount: number;
+}
+
+// ========================================
+// AUTHENTICATION & ROLE TYPES
+// ========================================
+
+export interface SignupData {
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'brand_admin' | 'user';
+  department?: string;
+  employeeNumber?: string;
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+  currentBrandId?: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  token: string;
+  user: User;
+  brands: Brand[];
+  currentBrand: Brand | null;
+  user_global_role?: 'admin' | 'brand_admin' | 'user';
+}
+
+export interface BrandResponse {
+  success: boolean;
+  data: Brand | Brand[];
+  message: string;
+  user_global_role?: 'admin' | 'brand_admin' | 'user';
 }
