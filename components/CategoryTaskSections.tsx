@@ -62,6 +62,17 @@ export default function CategoryTaskSections({
     setRefreshKey(prev => prev + 1);
   }, [categories]);
 
+  // Listen for taskUpdated events
+  useEffect(() => {
+    const handleTaskUpdated = (event: any) => {
+      console.log('CategoryTaskSections: Received taskUpdated event', event.detail);
+      setRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('taskUpdated', handleTaskUpdated);
+    return () => window.removeEventListener('taskUpdated', handleTaskUpdated);
+  }, []);
+
   const toggleSection = (categoryName: string) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -434,14 +445,25 @@ export default function CategoryTaskSections({
                               e.stopPropagation();
                               onTaskStatusChange(task._id, e.target.value);
                             }}
-                            className={`px-1 py-1 rounded text-xs font-medium border-0 bg-transparent ${task.status === 'Yet to Start' ? 'bg-gray-100 text-gray-800' : task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : task.status === 'Completed' ? 'bg-green-100 text-green-800' : task.status === 'Blocked' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}
+                            className={`px-1 py-1 rounded text-xs font-medium border-0 bg-transparent ${
+                              task.status === 'Yet to Start' ? 'bg-gray-100 text-gray-800' : 
+                              task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : 
+                              task.status === 'Under Review' ? 'bg-amber-100 text-amber-800' : 
+                              task.status === 'Completed' ? 'bg-green-100 text-green-800' : 
+                              task.status === 'Blocked' ? 'bg-red-100 text-red-800' : 
+                              task.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' : 
+                              task.status === 'Cancelled' ? 'bg-gray-100 text-gray-800' : 
+                              'bg-purple-100 text-purple-800'
+                            }`}
                           >
                             <option value="Yet to Start">Yet to Start</option>
                             <option value="In Progress">In Progress</option>
+                            <option value="Under Review">Under Review</option>
                             <option value="Completed">Completed</option>
                             <option value="Blocked">Blocked</option>
                             <option value="On Hold">On Hold</option>
                             <option value="Cancelled">Cancelled</option>
+                            <option value="Recurring">Recurring</option>
                           </select>
                           <button 
                             className="p-1 text-gray-400 hover:text-gray-600 ml-2"
@@ -580,10 +602,12 @@ export default function CategoryTaskSections({
                         >
                           <option value="Yet to Start">Yet to Start</option>
                           <option value="In Progress">In Progress</option>
+                          <option value="Under Review">Under Review</option>
                           <option value="Completed">Completed</option>
                           <option value="Blocked">Blocked</option>
                           <option value="On Hold">On Hold</option>
                           <option value="Cancelled">Cancelled</option>
+                          <option value="Recurring">Recurring</option>
                         </select>
                       </div>
                     </div>

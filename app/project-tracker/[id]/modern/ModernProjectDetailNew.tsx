@@ -247,8 +247,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     if (!selectedTask) return;
     
     try {
-      console.log('handleUpdateTask: Updating task and refreshing list');
-      await updateTask(currentBrand?.id || 'test-brand-id', selectedTask._id, selectedTask);
+      console.log('handleUpdateTask: Refreshing task list after update');
       
       // Force refresh the task list to show updates in category sections
       if (currentBrand) {
@@ -260,23 +259,42 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
         // Force a state update to trigger re-render
         setSelectedTask({ ...selectedTask, _lastUpdated: Date.now() });
         
+        // Also force a refresh of the selected task data
+        setTimeout(async () => {
+          console.log('handleUpdateTask: Refreshing selected task data');
+          // Get the latest task data from the refreshed task list
+          await getProjectTasks(currentBrand.id, projectId);
+          // The tasks will be updated in the context, so we can access them from there
+          // For now, just force a re-render with the current selectedTask
+          setSelectedTask((prev: any) => ({ ...prev, _lastUpdated: Date.now() }));
+        }, 600);
+        
         // Also force a small delay to ensure the update is processed
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log('handleUpdateTask: Forcing additional refresh');
-          getProjectTasks(currentBrand.id, projectId);
+          await getProjectTasks(currentBrand.id, projectId);
           setForceRefresh(prev => prev + 1);
-        }, 100);
+        }, 500);
+        
+        // One more refresh after a longer delay to ensure backend has processed
+        setTimeout(async () => {
+          console.log('handleUpdateTask: Final refresh to ensure data is current');
+          await getProjectTasks(currentBrand.id, projectId);
+          setForceRefresh(prev => prev + 1);
+        }, 1000);
         
         console.log('handleUpdateTask: Project tasks refreshed successfully');
       }
       
-      setShowTaskDetails(false);
+      // Don't close the task details panel automatically
+      // setShowTaskDetails(false);
     } catch (error) {
-      console.error('Error updating task:', error);
+      console.error('Error refreshing task list:', error);
     }
   };
 
   const handleTaskChange = (field: string, value: any) => {
+    console.log('handleTaskChange called:', { field, value, currentSelectedTask: selectedTask });
     setSelectedTask((prev: any) => ({
       ...prev,
       [field]: value
@@ -524,6 +542,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
                 {/* Task Details Panel */}
                 <TaskDetailsPanel
+                  key={`${selectedTask?._id}-${selectedTask?._lastUpdated || Date.now()}`}
                   showTaskDetails={showTaskDetails}
                   selectedTask={selectedTask}
                   users={users}

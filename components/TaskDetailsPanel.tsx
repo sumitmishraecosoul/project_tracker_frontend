@@ -85,6 +85,7 @@ export default function TaskDetailsPanel({
   // Initialize editing states when selectedTask changes
   useEffect(() => {
     if (selectedTask) {
+      console.log('TaskDetailsPanel: Updating editing states with selectedTask:', selectedTask);
       setEditingTask(selectedTask);
       setEditingTaskName(selectedTask.task || '');
       setEditingTaskDescription(selectedTask.description || '');
@@ -157,7 +158,29 @@ export default function TaskDetailsPanel({
         setAssigneeSearch('');
       }
     }
-  }, [selectedTask, currentBrand]);
+  }, [selectedTask, selectedTask?._lastUpdated, currentBrand]);
+
+  // Listen for taskUpdated events to refresh the task details
+  useEffect(() => {
+    const handleTaskUpdated = (event: any) => {
+      console.log('TaskDetailsPanel: Received taskUpdated event', event.detail);
+      if (event.detail && event.detail.taskId === selectedTask?._id) {
+        console.log('TaskDetailsPanel: Updating task details for current task');
+        // Force a re-render by updating the editing states
+        if (selectedTask) {
+          setEditingTask(selectedTask);
+          setEditingTaskName(selectedTask.task || '');
+          setEditingTaskDescription(selectedTask.description || '');
+          setEditingTaskPriority(selectedTask.priority || '');
+          setEditingTaskStatus(selectedTask.status || '');
+          setEditingTaskAssignee(selectedTask.assignedTo?.id || selectedTask.assignedTo || '');
+        }
+      }
+    };
+
+    window.addEventListener('taskUpdated', handleTaskUpdated);
+    return () => window.removeEventListener('taskUpdated', handleTaskUpdated);
+  }, [selectedTask]);
 
   // Load brand users
   const loadBrandUsers = async () => {
@@ -277,8 +300,17 @@ export default function TaskDetailsPanel({
           setEditingTaskPriority(value);
           break;
         case 'status':
-          updateData = { status: value };
-          setEditingTaskStatus(value);
+          // Use the specific status update API instead of the general task update
+          console.log('Status update:', { field, value, taskId: editingTask._id, brandId: currentBrand.id });
+          try {
+            const response = await apiService.updateBrandTaskStatus(currentBrand.id, editingTask._id, value as any);
+            console.log('Status update API response:', response);
+            setEditingTaskStatus(value);
+            console.log('Status updated successfully via updateBrandTaskStatus');
+          } catch (error) {
+            console.error('Status update failed:', error);
+            throw error;
+          }
           break;
         case 'assignedTo':
           updateData = { assignedTo: value };
@@ -299,31 +331,68 @@ export default function TaskDetailsPanel({
           updateData = { [field]: value };
       }
       
-      // Always update the task with the data
-      console.log('Updating task with data:', { brandId: currentBrand.id, taskId: editingTask._id, updateData });
-      const response = await apiService.updateBrandTask(currentBrand.id, editingTask._id, updateData);
-      
-      if (response.success) {
-        // Update the editing task with the response data
-        const updatedTask = { ...editingTask, ...updateData };
-        setEditingTask(updatedTask);
-        
-        // Call parent update to refresh the main task list
+      // Handle status updates separately
+      if (field === 'status') {
+        // Status update is handled above, just trigger the refresh
+        console.log('Status update completed, triggering refresh');
         onTaskChange(field, value);
-        await onUpdateTask();
         
-        // Force a small delay to ensure the update is processed
-        setTimeout(() => {
-          console.log('TaskDetailsPanel: Task update completed, UI should refresh');
+        setTimeout(async () => {
+          console.log('TaskDetailsPanel: Calling onUpdateTask after status update');
+          await onUpdateTask();
+          
           // Trigger a window event to force refresh
           window.dispatchEvent(new CustomEvent('taskUpdated', { 
             detail: { taskId: editingTask._id, field, value } 
           }));
-        }, 100);
-        
-        console.log('Task updated successfully:', field, value);
+          
+          console.log('TaskDetailsPanel: Status update completed');
+        }, 200);
       } else {
-        throw new Error(response.message || 'Failed to update task');
+        // Handle other field updates normally
+        console.log('Updating task with data:', { 
+          brandId: currentBrand.id, 
+          taskId: editingTask._id, 
+          updateData,
+          field,
+          value
+        });
+        
+        const response = await apiService.updateBrandTask(currentBrand.id, editingTask._id, updateData);
+        
+        console.log('API Response:', response);
+        console.log('API Response success:', response?.success);
+        console.log('API Response data:', response?.data);
+        
+        if (response.success || response) {
+          // Use the response data if available, otherwise use the updateData
+          const responseData = response.data || response;
+          const updatedTask = { ...editingTask, ...updateData, ...responseData };
+          setEditingTask(updatedTask);
+          
+          console.log('TaskDetailsPanel: Local state updated with response data:', updatedTask);
+          
+          // Call parent update to refresh the main task list
+          onTaskChange(field, value);
+          
+          // Wait a bit before calling onUpdateTask to ensure the backend has processed
+          setTimeout(async () => {
+            console.log('TaskDetailsPanel: Calling onUpdateTask after delay');
+            await onUpdateTask();
+            
+            // Trigger a window event to force refresh
+            window.dispatchEvent(new CustomEvent('taskUpdated', { 
+              detail: { taskId: editingTask._id, field, value, updatedTask } 
+            }));
+            
+            console.log('TaskDetailsPanel: All updates completed');
+          }, 200);
+          
+          console.log('Task updated successfully:', field, value);
+        } else {
+          console.error('API update failed:', response);
+          throw new Error(response.message || 'Failed to update task');
+        }
       }
       
     } catch (error) {
@@ -577,9 +646,24 @@ export default function TaskDetailsPanel({
     switch (status) {
       case 'Completed': return 'bg-green-100 text-green-800';
       case 'In Progress': return 'bg-blue-100 text-blue-800';
+      case 'Under Review': return 'bg-amber-100 text-amber-800';
       case 'Blocked': return 'bg-red-100 text-red-800';
       case 'On Hold': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Yet to Start': return '⏳';
+      case 'In Progress': return '🔄';
+      case 'Under Review': return '👀';
+      case 'Completed': return '✅';
+      case 'Blocked': return '🚫';
+      case 'On Hold': return '⏸️';
+      case 'Cancelled': return '❌';
+      case 'Recurring': return '🔄';
+      default: return '❓';
     }
   };
 
@@ -594,6 +678,7 @@ export default function TaskDetailsPanel({
   const statusOptions = [
     { value: 'Yet to Start', label: 'Yet to Start', color: 'bg-gray-100 text-gray-800' },
     { value: 'In Progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
+    { value: 'Under Review', label: 'Under Review', color: 'bg-amber-100 text-amber-800' },
     { value: 'Completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
     { value: 'Blocked', label: 'Blocked', color: 'bg-red-100 text-red-800' },
     { value: 'On Hold', label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
@@ -605,7 +690,7 @@ export default function TaskDetailsPanel({
     if (field === 'priority') {
       setTaskPriority(value);
     } else if (field === 'status') {
-      setTaskStatus(value);
+      setEditingTaskStatus(value);
     }
     setActiveField(null);
   };
@@ -1087,7 +1172,7 @@ export default function TaskDetailsPanel({
                   className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(editingTaskStatus)} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-1`}
                   disabled={isUpdatingTask}
                 >
-                  <span>{editingTaskStatus}</span>
+                  <span>{getStatusIcon(editingTaskStatus)} {editingTaskStatus}</span>
                   <i className="ri-arrow-down-s-line text-xs"></i>
                 </button>
                 

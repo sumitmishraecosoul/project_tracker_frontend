@@ -1322,19 +1322,37 @@ class ApiService {
   async updateBrandTask(brandId: string, taskId: string, taskData: {
     task?: string;
     description?: string;
-    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+    status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
     priority?: 'Critical' | 'High' | 'Medium' | 'Low';
     assignedTo?: string;
     reporter?: string;
     eta?: string;
     dependencies?: string[];
   }) {
+    console.log('API Service - updateBrandTask called:', {
+      brandId,
+      taskId,
+      taskData,
+      url: `${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`,
+      headers: this.getAuthHeader()
+    });
+    
     const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
       body: JSON.stringify(taskData)
     });
-    return this.handleResponse(response);
+    
+    console.log('API Service - updateBrandTask response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    const result = this.handleResponse(response);
+    console.log('API Service - updateBrandTask result:', result);
+    return result;
   }
 
   // 5. Delete Brand Task
@@ -1357,13 +1375,31 @@ class ApiService {
   }
 
   // 7. Update Task Status
-  async updateBrandTaskStatus(brandId: string, taskId: string, status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring') {
+  async updateBrandTaskStatus(brandId: string, taskId: string, status: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring') {
+    console.log('API Service - updateBrandTaskStatus called:', {
+      brandId,
+      taskId,
+      status,
+      url: `${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/status`,
+      headers: this.getAuthHeader()
+    });
+    
     const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/status`, {
       method: 'PUT',
       headers: this.getAuthHeader(),
       body: JSON.stringify({ status })
     });
-    return this.handleResponse(response);
+    
+    console.log('API Service - updateBrandTaskStatus response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    const result = this.handleResponse(response);
+    console.log('API Service - updateBrandTaskStatus result:', result);
+    return result;
   }
 
   // 8. Update Task Priority
@@ -1904,7 +1940,7 @@ class ApiService {
     category_id: string; // NEW: Required field
     assignedTo: string;
     reporter: string;
-    status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+    status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
     priority?: 'Critical' | 'High' | 'Medium' | 'Low';
     eta: string;
   }) {
