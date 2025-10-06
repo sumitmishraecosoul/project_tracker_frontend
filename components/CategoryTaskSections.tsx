@@ -256,7 +256,7 @@ export default function CategoryTaskSections({
           <div className="grid grid-cols-12 gap-1 text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
             <div className="col-span-1">Check</div>
             <div className="col-span-2">Name</div>
-            <div className="col-span-2">Assignee</div>
+            <div className="col-span-2">Assign to</div>
             <div className="col-span-2">Start Date</div>
             <div className="col-span-2">Due Date</div>
             <div className="col-span-1">Priority</div>

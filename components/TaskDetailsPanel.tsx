@@ -49,6 +49,7 @@ export default function TaskDetailsPanel({
   const [brandUsers, setBrandUsers] = useState<any[]>([]);
   const [loadingBrandUsers, setLoadingBrandUsers] = useState(false);
   
+  
   // Field management
   const [activeField, setActiveField] = useState<string | null>(null);
   const [taskPriority, setTaskPriority] = useState<string>('Low');
@@ -251,6 +252,7 @@ export default function TaskDetailsPanel({
       setIsUpdatingTask(false);
     }
   };
+
 
   const handleUpdateTask = async (field: string, value: any) => {
     if (!editingTask || !currentBrand || isUpdatingTask) return;
@@ -664,9 +666,37 @@ export default function TaskDetailsPanel({
           </div>
         </div>
 
-        {/* Assignee */}
+        {/* Created by (Reporter) - Read Only */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Assignee</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Created by</label>
+          <div className="flex items-center space-x-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
+            {selectedTask.reporter?.name ? (
+              <>
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-medium text-sm">
+                    {selectedTask.reporter.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">{selectedTask.reporter.name}</div>
+                  <div className="text-xs text-gray-500">{selectedTask.reporter.email}</div>
+                </div>
+                <div className="text-xs text-gray-400">Creator</div>
+              </>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  <i className="ri-user-line text-gray-500 text-sm"></i>
+                </div>
+                <div className="text-sm text-gray-500">No creator information</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Assign to */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Assign to</label>
           <div className="relative assignee-dropdown">
             <input
               type="text"
