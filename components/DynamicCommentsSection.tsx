@@ -194,7 +194,13 @@ export default function DynamicCommentsSection({ taskId, currentUser }: DynamicC
       <div className="space-y-3">
         <div className="flex items-start space-x-2">
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-            {currentUser?.name?.charAt(0)?.toUpperCase() || 'U'}
+            {(() => {
+              // Try multiple sources for user info
+              const currentUserData = localStorage.getItem('currentUser');
+              const userData = currentUserData ? JSON.parse(currentUserData) : null;
+              const userName = userData?.name || currentUser?.name || 'User';
+              return userName.charAt(0)?.toUpperCase();
+            })()}
           </div>
           <div className="flex-1">
             <textarea
@@ -237,15 +243,21 @@ export default function DynamicCommentsSection({ taskId, currentUser }: DynamicC
         </div>
       ) : comments.length > 0 ? (
         <div className="space-y-3 mt-4">
-          {comments.map((comment) => (
+          {comments.map((comment) => {
+            console.log('Rendering comment:', comment);
+            const authorName = comment.author?.name || comment.created_by?.name || comment.user?.name || 'Unknown User';
+            const authorInitial = authorName.charAt(0)?.toUpperCase() || 'U';
+            console.log('Author info:', { authorName, authorInitial, comment });
+            
+            return (
             <div key={comment._id} className="flex items-start space-x-2">
               <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                {comment.author?.name?.charAt(0)?.toUpperCase() || 'U'}
+                {authorInitial}
               </div>
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-1">
                   <span className="text-sm font-medium text-gray-900">
-                    {comment.author?.name || 'Unknown User'}
+                    {authorName}
                   </span>
                   <span className="text-xs text-gray-500">
                     {formatDate(comment.created_at || comment.createdAt)}
@@ -315,7 +327,8 @@ export default function DynamicCommentsSection({ taskId, currentUser }: DynamicC
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-4 text-gray-500 text-sm">

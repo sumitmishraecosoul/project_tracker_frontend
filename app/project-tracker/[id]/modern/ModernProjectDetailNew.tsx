@@ -386,7 +386,12 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
               <i className="ri-flashlight-line text-lg"></i>
             </button>
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-              SM
+              {(() => {
+                const currentUserData = localStorage.getItem('currentUser');
+                const userData = currentUserData ? JSON.parse(currentUserData) : null;
+                const userName = userData?.name || 'User';
+                return userName.charAt(0)?.toUpperCase();
+              })()}
             </div>
           </div>
         </div>
@@ -401,7 +406,12 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
                     <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                      SM
+                      {(() => {
+                        const currentUserData = localStorage.getItem('currentUser');
+                        const userData = currentUserData ? JSON.parse(currentUserData) : null;
+                        const userName = userData?.name || 'User';
+                        return userName.charAt(0)?.toUpperCase();
+                      })()}
                     </div>
                     <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
                       <i className="ri-user-line text-xs text-gray-600"></i>
