@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useCategories } from './CategoryContext';
 import { useTasks } from './TaskContext';
 import { useBrand } from './BrandContext';
+import { apiService } from '../lib/api-service';
 
 interface CategoryTaskSectionsProps {
   onTaskSelect: (task: any) => void;
@@ -104,20 +105,47 @@ export default function CategoryTaskSections({
   };
 
   const loadBrandUsers = async () => {
-    if (!currentBrand) return;
+    const brandId = currentBrand?.id;
+    if (!brandId) {
+      console.log('No current brand, trying to load users anyway for testing');
+      // Try to load users even without brand for testing
+      try {
+        const response = await apiService.getBrandUsers('test-brand-id');
+        let users = [];
+        if (Array.isArray(response)) {
+          users = response;
+        } else if (response && Array.isArray(response.data)) {
+          users = response.data;
+        } else if (response && response.users) {
+          users = response.users;
+        }
+        console.log('Test brand users loaded:', users);
+        setBrandUsers(users);
+      } catch (error) {
+        console.error('Error loading test brand users:', error);
+        setBrandUsers([]);
+      }
+      return;
+    }
     
     try {
-      console.log('Loading brand users for brand:', currentBrand.id);
-      const response = await fetch(`/api/brands/${currentBrand.id}/users`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Brand users response:', data);
-        setBrandUsers(data.users || data || []);
-      } else {
-        console.error('Failed to load brand users:', response.status, response.statusText);
+      console.log('Loading brand users for brand:', brandId);
+      const response = await apiService.getBrandUsers(brandId);
+      
+      let users = [];
+      if (Array.isArray(response)) {
+        users = response;
+      } else if (response && Array.isArray(response.data)) {
+        users = response.data;
+      } else if (response && response.users) {
+        users = response.users;
       }
+      
+      console.log('Brand users loaded:', users);
+      setBrandUsers(users);
     } catch (error) {
       console.error('Error loading brand users:', error);
+      setBrandUsers([]);
     }
   };
 
@@ -402,7 +430,7 @@ export default function CategoryTaskSections({
                             <option value="Cancelled">Cancelled</option>
                           </select>
                           <button 
-                            className="p-1 text-gray-400 hover:text-gray-600"
+                            className="p-1 text-gray-400 hover:text-gray-600 ml-2"
                             onClick={(e) => {
                               e.stopPropagation();
                               onTaskSelect(task);
