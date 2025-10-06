@@ -219,7 +219,14 @@ export default function CategoryTaskSections({
     tasksLoading,
     categories: categories?.length || 0,
     tasks: tasks?.length || 0,
-    currentBrand: currentBrand?.id
+    currentBrand: currentBrand?.id,
+    sampleTask: tasks?.[0] ? {
+      id: tasks[0]._id,
+      name: tasks[0].task,
+      startDate: tasks[0].startDate,
+      eta: tasks[0].eta,
+      assignedTo: tasks[0].assignedTo
+    } : null
   });
 
   if (categoriesLoading || tasksLoading) {
@@ -400,7 +407,9 @@ export default function CategoryTaskSections({
                         </div>
                         <div className="col-span-2">
                           <span className="text-sm text-gray-500">
-                            {task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                            {task.startDate ? new Date(task.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 
+                             task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 
+                             'No date'}
                           </span>
                         </div>
                         <div className="col-span-2">
