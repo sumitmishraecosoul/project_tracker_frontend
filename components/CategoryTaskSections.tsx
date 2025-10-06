@@ -176,12 +176,17 @@ export default function CategoryTaskSections({
     try {
       setIsCreatingTask(true);
       
+      // Get current user ID for reporter (who created the task)
+      const currentUser = localStorage.getItem('currentUser');
+      const userData = currentUser ? JSON.parse(currentUser) : null;
+      const userId = userData?.id || currentBrand?.id || '';
+      
       const taskData = {
         task: newTaskName.trim(),
         projectId: projectId,
         category_id: editingCategoryId,
         assignedTo: newTaskAssignee || currentBrand.id,
-        reporter: currentBrand.id,
+        reporter: userId, // Use actual current user ID instead of brand ID
         eta: newTaskDueDate || new Date().toISOString(),
         startDate: newTaskStartDate || new Date().toISOString(),
         priority: newTaskPriority,
