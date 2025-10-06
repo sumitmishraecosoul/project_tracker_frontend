@@ -91,6 +91,33 @@ export default function TaskDetailsPanel({
       setEditingTaskStatus(selectedTask.status || '');
       setEditingTaskAssignee(selectedTask.assignedTo?.id || selectedTask.assignedTo || '');
       
+      // Set assignee display
+      console.log('Initializing assignee for task:', { 
+        assignedTo: selectedTask.assignedTo, 
+        type: typeof selectedTask.assignedTo,
+        hasName: selectedTask.assignedTo?.name,
+        hasEmail: selectedTask.assignedTo?.email
+      });
+      
+      if (selectedTask.assignedTo) {
+        if (typeof selectedTask.assignedTo === 'string') {
+          // If assignedTo is just an email string
+          setSelectedAssignee({ email: selectedTask.assignedTo, name: selectedTask.assignedTo, isEmail: true });
+          setAssigneeSearch(selectedTask.assignedTo);
+        } else if (selectedTask.assignedTo.name && selectedTask.assignedTo.email) {
+          // If assignedTo is a user object
+          setSelectedAssignee(selectedTask.assignedTo);
+          setAssigneeSearch(`${selectedTask.assignedTo.name} (${selectedTask.assignedTo.email})`);
+        } else {
+          // Fallback
+          setSelectedAssignee(null);
+          setAssigneeSearch('');
+        }
+      } else {
+        setSelectedAssignee(null);
+        setAssigneeSearch('');
+      }
+      
       // Set dates
       if (selectedTask.startDate) {
         setStartDate(new Date(selectedTask.startDate));
@@ -181,21 +208,43 @@ export default function TaskDetailsPanel({
   const handleAssigneeSelect = async (assignee: any, isEmail = false) => {
     if (!selectedTask || !currentBrand) return;
     
+    console.log('handleAssigneeSelect called:', { assignee, isEmail, taskId: selectedTask._id, brandId: currentBrand.id });
+    
     try {
       setIsUpdatingTask(true);
       
-      if (isEmail && isValidEmail(assignee)) {
+      if (assignee === null) {
+        // Clear assignee
+        await apiService.assignBrandTask(currentBrand.id, selectedTask._id, '');
+        setSelectedAssignee(null);
+        setAssigneeSearch('');
+        
+        // Update the task in the parent component
+        onTaskChange('assignedTo', null);
+      } else if (isEmail && isValidEmail(assignee)) {
         await apiService.assignBrandTask(currentBrand.id, selectedTask._id, assignee);
         setSelectedAssignee({ email: assignee, name: assignee, isEmail: true });
         setAssigneeSearch(assignee);
+        
+        // Update the task in the parent component
+        onTaskChange('assignedTo', { email: assignee, name: assignee, isEmail: true });
       } else if (assignee._id || assignee.id) {
         const assigneeId = assignee._id || assignee.id;
         await apiService.assignBrandTask(currentBrand.id, selectedTask._id, assigneeId);
         setSelectedAssignee(assignee);
         setAssigneeSearch(`${assignee.name} (${assignee.email})`);
+        
+        // Update the task in the parent component
+        onTaskChange('assignedTo', assignee);
       }
       
       setShowAssigneeDropdown(false);
+      
+      // Trigger parent component refresh
+      onUpdateTask();
+      
+      // Dispatch custom event for global refresh
+      window.dispatchEvent(new CustomEvent('taskUpdated'));
     } catch (error) {
       console.error('Error assigning task:', error);
     } finally {
@@ -631,9 +680,27 @@ export default function TaskDetailsPanel({
               onBlur={() => {
                 setTimeout(() => setShowAssigneeDropdown(false), 200);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               disabled={isUpdatingTask}
             />
+            {assigneeSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeSearch('');
+                  setSelectedAssignee(null);
+                  setShowAssigneeDropdown(true);
+                  // Clear assignee from task
+                  if (selectedTask && currentBrand) {
+                    handleAssigneeSelect(null, false);
+                  }
+                }}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                disabled={isUpdatingTask}
+              >
+                <i className="ri-close-line text-sm"></i>
+              </button>
+            )}
             
             {showAssigneeDropdown && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
@@ -1179,16 +1246,39 @@ export default function TaskDetailsPanel({
 
         {/* Subtasks */}
         <div>
+          {/* Header Section */}
           <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700">
               Subtasks ({taskSubtasks[selectedTask._id]?.length || 0})
             </label>
+            {taskSubtasks[selectedTask._id] && taskSubtasks[selectedTask._id].length > 0 && (
+              <div className="flex flex-col items-end">
+                <div className="flex items-center space-x-2">
+                  <div className="w-20 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${getSubtaskProgress(selectedTask._id)}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs text-gray-600">
+                    {getSubtaskProgress(selectedTask._id)}% complete
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500 mt-1">
+                  {taskSubtasks[selectedTask._id].filter(s => s.status === 'Completed').length} of {taskSubtasks[selectedTask._id].length} completed
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Add Subtask Button */}
+          <div className="mb-4">
             <button 
               onClick={() => {
                 setCurrentTaskForSubtask(selectedTask._id);
                 setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: true }));
               }}
-              className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+              className="px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 bg-white"
             >
               <i className="ri-add-line mr-1"></i>
               Add subtask
@@ -1353,29 +1443,39 @@ export default function TaskDetailsPanel({
                     </div>
                   ) : (
                     /* Normal Subtask Display */
-                    <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
-                      <div className="flex items-center space-x-2 flex-1">
-                        <button
-                          onClick={() => handleSubtaskComplete(subtask._id, subtask.status !== 'Completed')}
-                          className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
-                        >
-                          {subtask.status === 'Completed' ? (
-                            <i className="ri-check-line text-xs text-green-600"></i>
-                          ) : (
-                            <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
-                          )}
-                        </button>
-                        <span className={`text-sm ${subtask.status === 'Completed' ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                          {subtask.title || subtask.task}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(subtask.priority)}`}>
-                          {subtask.priority}
-                        </span>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(subtask.status)}`}>
-                          {subtask.status}
-                        </span>
+                    <div className="p-2 bg-gray-50 rounded border border-gray-200 mb-1">
+                      {/* First Line: Checkbox, Name, Priority, Status, Actions */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => handleSubtaskComplete(subtask._id, subtask.status !== 'Completed')}
+                            className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                          >
+                            {subtask.status === 'Completed' ? (
+                              <i className="ri-check-line text-xs text-green-600"></i>
+                            ) : (
+                              <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                            )}
+                          </button>
+                          
+                          {/* Subtask Name */}
+                          <span className={`text-sm font-medium ${subtask.status === 'Completed' ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                            {subtask.title || subtask.task}
+                          </span>
+                          
+                          {/* Priority Badge */}
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(subtask.priority)}`}>
+                            {subtask.priority}
+                          </span>
+                          
+                          {/* Status Badge */}
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(subtask.status)}`}>
+                            {subtask.status}
+                          </span>
+                        </div>
+                        
+                        {/* Action Icons */}
                         <div className="flex items-center space-x-1">
                           <button
                             onClick={() => {
@@ -1386,19 +1486,42 @@ export default function TaskDetailsPanel({
                               setEditingSubtaskStatus(subtask.status);
                               setEditingSubtaskAssignee(subtask.assignedTo || '');
                             }}
-                            className="p-1 text-gray-400 hover:text-gray-600"
+                            className="p-1 text-blue-500 hover:text-blue-700"
                             title="Edit subtask"
                           >
                             <i className="ri-edit-line text-sm"></i>
                           </button>
                           <button
                             onClick={() => handleDeleteSubtask(subtask._id)}
-                            className="p-1 text-red-400 hover:text-red-600"
+                            className="p-1 text-red-500 hover:text-red-700"
                             title="Delete subtask"
                           >
                             <i className="ri-delete-bin-line text-sm"></i>
                           </button>
                         </div>
+                      </div>
+                      
+                      {/* Second Line: Assignee and Due Date */}
+                      <div className="flex items-center space-x-3">
+                        {/* Assignee */}
+                        <div className="flex items-center space-x-1">
+                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-medium">
+                              {subtask.assignedTo?.name ? subtask.assignedTo.name.charAt(0).toUpperCase() : 'U'}
+                            </span>
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {subtask.assignedTo?.name || 'Unassigned'}
+                          </span>
+                        </div>
+                        
+                        {/* Due Date */}
+                        {subtask.dueDate && (
+                          <div className="flex items-center space-x-1 text-sm text-gray-500">
+                            <i className="ri-calendar-line text-xs"></i>
+                            <span>{new Date(subtask.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
