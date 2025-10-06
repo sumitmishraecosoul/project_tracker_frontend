@@ -297,7 +297,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     console.log('handleTaskChange called:', { field, value, currentSelectedTask: selectedTask });
     setSelectedTask((prev: any) => ({
       ...prev,
-      [field]: value
+      [field]: value,
+      _lastUpdated: Date.now() // Force a new object reference
     }));
   };
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
 import DynamicCommentsSection from './DynamicCommentsSection';
+import TaskLinksSection from './TaskLinksSection';
 
 interface TaskDetailsPanelProps {
   showTaskDetails: boolean;
@@ -160,6 +161,16 @@ export default function TaskDetailsPanel({
     }
   }, [selectedTask, selectedTask?._lastUpdated, currentBrand]);
 
+  // Watch for status changes specifically
+  useEffect(() => {
+    if (selectedTask && selectedTask.status !== editingTaskStatus) {
+      console.log('TaskDetailsPanel: Status changed in selectedTask, updating editingTaskStatus');
+      console.log('Previous status:', editingTaskStatus, 'New status:', selectedTask.status);
+      setEditingTaskStatus(selectedTask.status);
+      setEditingTask(selectedTask);
+    }
+  }, [selectedTask?.status, editingTaskStatus]);
+
   // Listen for taskUpdated events to refresh the task details
   useEffect(() => {
     const handleTaskUpdated = (event: any) => {
@@ -305,7 +316,14 @@ export default function TaskDetailsPanel({
           try {
             const response = await apiService.updateBrandTaskStatus(currentBrand.id, editingTask._id, value as any);
             console.log('Status update API response:', response);
+            
+            // Update both the editing status and the main editing task immediately
             setEditingTaskStatus(value);
+            setEditingTask((prev: any) => ({ ...prev, status: value }));
+            
+            // Update the selectedTask in parent component immediately
+            onTaskChange(field, value);
+            
             console.log('Status updated successfully via updateBrandTaskStatus');
           } catch (error) {
             console.error('Status update failed:', error);
@@ -1649,6 +1667,14 @@ export default function TaskDetailsPanel({
               <div>No subtasks yet</div>
             </div>
           )}
+        </div>
+
+        {/* Task Links Section */}
+        <div>
+          <TaskLinksSection 
+            taskId={selectedTask._id}
+            brandId={currentBrand?.id}
+          />
         </div>
 
         {/* Comments Section */}

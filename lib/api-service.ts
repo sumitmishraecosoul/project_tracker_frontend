@@ -2069,6 +2069,142 @@ class ApiService {
     return this.handleResponse(response);
   }
 
+  // ==================== TASK LINKS API METHODS ====================
+
+  /**
+   * Get all links for a specific task
+   */
+  async getTaskLinks(brandId: string, taskId: string) {
+    console.log('ApiService: Getting task links', { brandId, taskId });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/links`, {
+        method: 'GET',
+        headers: this.getAuthHeader(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Get task links response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Get task links error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new link for a task
+   */
+  async createTaskLink(brandId: string, taskId: string, linkData: {
+    name: string;
+    url: string;
+    description?: string;
+  }) {
+    console.log('ApiService: Creating task link', { brandId, taskId, linkData });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/links`, {
+        method: 'POST',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify(linkData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Create task link response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Create task link error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing task link
+   */
+  async updateTaskLink(brandId: string, taskId: string, linkId: string, linkData: {
+    name?: string;
+    url?: string;
+    description?: string;
+  }) {
+    console.log('ApiService: Updating task link', { brandId, taskId, linkId, linkData });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/links/${linkId}`, {
+        method: 'PUT',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify(linkData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Update task link response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Update task link error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a task link
+   */
+  async deleteTaskLink(brandId: string, taskId: string, linkId: string) {
+    console.log('ApiService: Deleting task link', { brandId, taskId, linkId });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/links/${linkId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeader(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Delete task link response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Delete task link error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reorder task links
+   */
+  async reorderTaskLinks(brandId: string, taskId: string, linkOrders: Array<{
+    linkId: string;
+    order: number;
+  }>) {
+    console.log('ApiService: Reordering task links', { brandId, taskId, linkOrders });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/${taskId}/links-reorder`, {
+        method: 'PUT',
+        headers: this.getAuthHeader(),
+        body: JSON.stringify({ linkOrders }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Reorder task links response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Reorder task links error', error);
+      throw error;
+    }
+  }
+
 }
 
 export const apiService = new ApiService();
