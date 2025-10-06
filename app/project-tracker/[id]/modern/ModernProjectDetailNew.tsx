@@ -42,6 +42,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const [newTaskName, setNewTaskName] = useState('');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [selectedCategoryForTask, setSelectedCategoryForTask] = useState<string>('');
+  const [forceRefresh, setForceRefresh] = useState(0);
   
   // Category state removed - now handled by CategoryProvider
   
@@ -50,8 +51,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
   // Memoize CategoryProvider props to prevent unnecessary re-renders
   const categoryProviderProps = useMemo(() => ({
-    brandId: currentBrand?.id || '',
-    projectId
+    brandId: currentBrand?.id || 'test-brand-id', // Use test ID for now
+    projectId: projectId || 'test-project-id' // Use test ID for now
   }), [currentBrand?.id, projectId]);
 
   // Load data on component mount
@@ -106,17 +107,48 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     loadData();
   }, [projectId, currentBrand]);
 
+  // Listen for task update events to force refresh
+  useEffect(() => {
+    const handleTaskUpdate = async (event: any) => {
+      console.log('ModernProjectDetail: Received task update event', event.detail);
+      if (currentBrand && projectId) {
+        console.log('ModernProjectDetail: Refreshing tasks due to update event');
+        await getProjectTasks(currentBrand.id, projectId);
+        setForceRefresh(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('taskUpdated', handleTaskUpdate);
+    return () => window.removeEventListener('taskUpdated', handleTaskUpdate);
+  }, [currentBrand, projectId, getProjectTasks]);
+
   // Helper functions
 
   const handleTaskSelect = (task: any) => {
     setSelectedTask(task);
     setShowTaskDetails(true);
+    // Automatically collapse both sidebars when task details open
+    closeBothSidebars();
   };
 
-  const handleAddTask = (categoryId: string) => {
-    setSelectedCategoryForTask(categoryId);
-    setShowNewTaskInput(true);
-    setNewTaskName('');
+  const handleAddTask = async (categoryId: string, taskData?: any) => {
+    if (taskData) {
+      // Handle inline task creation from CategoryTaskSections
+      try {
+        setIsCreatingTask(true);
+        await createTask(currentBrand.id, taskData);
+        console.log('Task created successfully in category:', categoryId);
+      } catch (error) {
+        console.error('Error creating task:', error);
+      } finally {
+        setIsCreatingTask(false);
+      }
+    } else {
+      // Legacy behavior (should not be used anymore)
+      setSelectedCategoryForTask(categoryId);
+      setShowNewTaskInput(true);
+      setNewTaskName('');
+    }
   };
 
   const handleCreateTask = async () => {
@@ -155,7 +187,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
-      await updateTaskStatus(taskId, newStatus);
+      await updateTaskStatus(currentBrand.id, taskId, newStatus);
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -202,7 +234,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     if (!newSubtaskName.trim()) return;
     
     try {
-      await createSubtask(taskId, newSubtaskName.trim());
+      await createSubtask(currentBrand.id, taskId, newSubtaskName.trim());
       setNewSubtaskName('');
     } catch (error) {
       console.error('Error creating subtask:', error);
@@ -215,7 +247,29 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     if (!selectedTask) return;
     
     try {
-      await updateTask(selectedTask._id, selectedTask);
+      console.log('handleUpdateTask: Updating task and refreshing list');
+      await updateTask(currentBrand.id, selectedTask._id, selectedTask);
+      
+      // Force refresh the task list to show updates in category sections
+      if (currentBrand) {
+        console.log('handleUpdateTask: Refreshing project tasks for brand:', currentBrand.id, 'project:', projectId);
+        
+        // Force a complete refresh of the task list
+        await getProjectTasks(currentBrand.id, projectId);
+        
+        // Force a state update to trigger re-render
+        setSelectedTask({ ...selectedTask, _lastUpdated: Date.now() });
+        
+        // Also force a small delay to ensure the update is processed
+        setTimeout(() => {
+          console.log('handleUpdateTask: Forcing additional refresh');
+          getProjectTasks(currentBrand.id, projectId);
+          setForceRefresh(prev => prev + 1);
+        }, 100);
+        
+        console.log('handleUpdateTask: Project tasks refreshed successfully');
+      }
+      
       setShowTaskDetails(false);
     } catch (error) {
       console.error('Error updating task:', error);
@@ -262,18 +316,19 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     );
   }
 
-  // No brand selected
+  // No brand selected - temporarily allow rendering for testing
   if (!currentBrand) {
-    return (
-      <VerticalLayout>
-        <div className="h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">No brand selected</p>
-            <p className="text-sm text-gray-500">Please select a brand to view this project.</p>
-          </div>
-        </div>
-      </VerticalLayout>
-    );
+    console.log('ModernProjectDetail: No currentBrand, but allowing render for testing');
+    // return (
+    //   <VerticalLayout>
+    //     <div className="h-screen flex items-center justify-center">
+    //       <div className="text-center">
+    //         <p className="text-gray-600 mb-4">No brand selected</p>
+    //         <p className="text-sm text-gray-500">Please select a brand to view this project.</p>
+    //       </div>
+    //     </div>
+    //   </VerticalLayout>
+    // );
   }
 
   console.log('ModernProjectDetail: About to render CategoryProvider with', {
@@ -398,18 +453,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
             <div className="bg-white border-b border-gray-200 px-6 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <button 
-                    onClick={() => {
-                      // For now, we'll disable this button since tasks should be added to specific categories
-                      // Users should use the "Add task..." buttons in each category section
-                      alert('Please use the "Add task..." button in a specific category section');
-                    }}
-                    className="px-4 py-2 bg-gray-400 text-white text-sm rounded cursor-not-allowed flex items-center space-x-2"
-                    disabled
-                  >
-                    <i className="ri-add-line text-sm"></i>
-                    <span>Add task (use category sections below)</span>
-                  </button>
                   <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
                     <i className="ri-filter-line text-sm"></i>
                     <span>Filter</span>
@@ -443,115 +486,35 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
             {/* Task Header */}
             <div className="bg-white border-b border-gray-200 px-6 py-3">
-              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide">
+              <div className="grid grid-cols-12 gap-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
                 <div className="col-span-1">Check</div>
-                <div className="col-span-4">Name</div>
+                <div className="col-span-3">Name</div>
                 <div className="col-span-2">Assignee</div>
+                <div className="col-span-2">Start Date</div>
                 <div className="col-span-2">Due Date</div>
                 <div className="col-span-1">Priority</div>
-                <div className="col-span-2 text-center">Status</div>
+                <div className="col-span-1">Status</div>
               </div>
             </div>
 
 
-                  {/* Debug Info */}
-                  <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2 text-xs text-yellow-800">
-                    Debug: Tasks: {tasks?.length || 0}, Loading: {loading ? 'Yes' : 'No'}, Brand Loading: {brandLoading ? 'Yes' : 'No'}, Brand: {currentBrand?.id || 'None'}, Project: {projectId}
-                    <br />
-                    Brand Details: {currentBrand ? JSON.stringify(currentBrand, null, 2) : 'No brand'}
-                  </div>
 
-            {/* Task Input Field */}
-            {showNewTaskInput && (
-              <div className="bg-blue-50 border-b border-blue-200 px-6 py-4">
-                <div className="grid grid-cols-12 gap-4 items-center">
-                  <div className="col-span-1">
-                    <button className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400">
-                      <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
-                    </button>
-                  </div>
-                  <div className="col-span-4">
-                    <input
-                      type="text"
-                      placeholder={isCreatingTask ? "Creating task..." : "Write a task name"}
-                      value={newTaskName}
-                      onChange={(e) => setNewTaskName(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !isCreatingTask) {
-                          handleCreateTask();
-                        }
-                      }}
-                      className="w-full px-2 py-1 border-0 focus:outline-none text-sm placeholder-gray-400 bg-transparent"
-                      autoFocus
-                      disabled={isCreatingTask}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <button 
-                      onClick={handleCreateTask}
-                      disabled={!newTaskName.trim() || isCreatingTask}
-                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-1"
-                    >
-                      {isCreatingTask ? (
-                        <>
-                          <i className="ri-loader-4-line animate-spin text-xs"></i>
-                          <span>Creating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <i className="ri-check-line text-xs"></i>
-                          <span>Save</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="col-span-2">
-                    <button className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center hover:border-gray-400">
-                      <i className="ri-user-line text-xs text-gray-400"></i>
-                    </button>
-                  </div>
-                  <div className="col-span-2">
-                    <button className="p-1 text-gray-400 hover:text-gray-600">
-                      <i className="ri-calendar-line text-sm"></i>
-                    </button>
-                  </div>
-                  <div className="col-span-1">
-                    <button
-                      onClick={() => {
-                        if (!isCreatingTask) {
-                          setShowNewTaskInput(false);
-                          setNewTaskName('');
-                          setSelectedCategoryForTask('');
-                        }
-                      }}
-                      className="text-gray-400 hover:text-gray-600"
-                      disabled={isCreatingTask}
-                    >
-                      {isCreatingTask ? (
-                        <i className="ri-loader-4-line animate-spin text-sm"></i>
-                      ) : (
-                        <i className="ri-close-line text-sm"></i>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* Category Task Sections */}
-            {currentBrand ? (
-              <CategoryTaskSections
-                onTaskSelect={handleTaskSelect}
-                selectedTask={selectedTask}
-                onAddTask={handleAddTask}
-                onTaskStatusChange={handleTaskStatusChange}
-                onTaskCheckboxClick={handleTaskCheckboxClick}
-                expandedTasks={expandedTasks}
-                toggleTaskExpansion={toggleTaskExpansion}
-                taskSubtasks={subtasks}
-                getAssigneeAvatar={getAssigneeAvatar}
-              />
-            ) : (
+                  {/* Category Task Sections */}
+                  <CategoryTaskSections
+                    key={`${currentBrand?.id || 'test'}-${projectId || 'test'}-${tasks?.length || 0}-${forceRefresh}`}
+                    onTaskSelect={handleTaskSelect}
+                    selectedTask={selectedTask}
+                    onAddTask={handleAddTask}
+                    onTaskStatusChange={handleTaskStatusChange}
+                    onTaskCheckboxClick={handleTaskCheckboxClick}
+                    expandedTasks={expandedTasks}
+                    toggleTaskExpansion={toggleTaskExpansion}
+                    taskSubtasks={subtasks}
+                    getAssigneeAvatar={getAssigneeAvatar}
+                    projectId={projectId}
+                  />
+                  {false && (
               <div className="bg-white p-6 text-center">
                 <p className="text-gray-600 mb-4">No brand selected. Please select a brand to view categories.</p>
                 <p className="text-sm text-gray-500">Current Brand: {currentBrand ? currentBrand.id : 'None'}</p>

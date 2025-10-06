@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../lib/api-service';
+import DynamicCommentsSection from './DynamicCommentsSection';
 
 interface TaskDetailsPanelProps {
   showTaskDetails: boolean;
@@ -25,14 +26,17 @@ export default function TaskDetailsPanel({
   projectId
 }: TaskDetailsPanelProps) {
   // Task editing states
+  const [editingTask, setEditingTask] = useState<any>(null);
   const [editingTaskName, setEditingTaskName] = useState('');
   const [editingTaskDescription, setEditingTaskDescription] = useState('');
+  const [editingTaskAssignee, setEditingTaskAssignee] = useState('');
   const [editingTaskPriority, setEditingTaskPriority] = useState('');
   const [editingTaskStatus, setEditingTaskStatus] = useState('');
+  const [editingTaskDueDate, setEditingTaskDueDate] = useState('');
   const [isUpdatingTask, setIsUpdatingTask] = useState(false);
   
   // Date management
-  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectingMode, setSelectingMode] = useState<'start' | 'due'>('due');
@@ -45,19 +49,27 @@ export default function TaskDetailsPanel({
   const [brandUsers, setBrandUsers] = useState<any[]>([]);
   const [loadingBrandUsers, setLoadingBrandUsers] = useState(false);
   
+  // Field management
+  const [activeField, setActiveField] = useState<string | null>(null);
+  const [taskPriority, setTaskPriority] = useState<string>('Low');
+  const [taskStatus, setTaskStatus] = useState<string>('On track');
+  
   // Subtask management
-  const [showSubtaskInput, setShowSubtaskInput] = useState<{ [key: string]: boolean }>({});
+  const [showSubtaskInput, setShowSubtaskInput] = useState<{ [taskId: string]: boolean }>({});
   const [newSubtaskName, setNewSubtaskName] = useState('');
-  const [subtaskPriority, setSubtaskPriority] = useState('Low');
-  const [subtaskStatus, setSubtaskStatus] = useState('Yet to Start');
-  const [subtaskAssignee, setSubtaskAssignee] = useState('');
+  const [currentTaskForSubtask, setCurrentTaskForSubtask] = useState<string | null>(null);
+  const [taskSubtasks, setTaskSubtasks] = useState<{ [taskId: string]: any[] }>({});
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
-  const [taskSubtasks, setTaskSubtasks] = useState<{ [key: string]: any[] }>({});
   const [isUpdatingSubtask, setIsUpdatingSubtask] = useState(false);
+  const [editingSubtask, setEditingSubtask] = useState<any>(null);
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
   const [editingSubtaskPriority, setEditingSubtaskPriority] = useState('');
   const [editingSubtaskStatus, setEditingSubtaskStatus] = useState('');
+  const [editingSubtaskAssignee, setEditingSubtaskAssignee] = useState('');
+  const [subtaskPriority, setSubtaskPriority] = useState('Low');
+  const [subtaskStatus, setSubtaskStatus] = useState('Yet to Start');
+  const [subtaskAssignee, setSubtaskAssignee] = useState('');
   
   // Dependencies management
   const [showDependenciesDropdown, setShowDependenciesDropdown] = useState(false);
@@ -68,17 +80,16 @@ export default function TaskDetailsPanel({
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [taskComments, setTaskComments] = useState<any[]>([]);
-  
-  // Field management
-  const [activeField, setActiveField] = useState<string | null>(null);
 
   // Initialize editing states when selectedTask changes
   useEffect(() => {
     if (selectedTask) {
+      setEditingTask(selectedTask);
       setEditingTaskName(selectedTask.task || '');
       setEditingTaskDescription(selectedTask.description || '');
       setEditingTaskPriority(selectedTask.priority || '');
       setEditingTaskStatus(selectedTask.status || '');
+      setEditingTaskAssignee(selectedTask.assignedTo?.id || selectedTask.assignedTo || '');
       
       // Set dates
       if (selectedTask.startDate) {
@@ -104,6 +115,18 @@ export default function TaskDetailsPanel({
       // Load brand users
       if (currentBrand?.id && brandUsers.length === 0) {
         loadBrandUsers();
+      }
+      
+      // Load available dependencies (other tasks in the project)
+      if (currentBrand?.id && projectId) {
+        loadAvailableDependencies();
+      }
+      
+      // Set assignee search
+      if (selectedTask.assignedTo?.name) {
+        setAssigneeSearch(`${selectedTask.assignedTo.name} (${selectedTask.assignedTo.email})`);
+      } else {
+        setAssigneeSearch('');
       }
     }
   }, [selectedTask, currentBrand]);
@@ -181,12 +204,14 @@ export default function TaskDetailsPanel({
   };
 
   const handleUpdateTask = async (field: string, value: any) => {
-    if (!selectedTask || !currentBrand) return;
+    if (!editingTask || !currentBrand || isUpdatingTask) return;
     
+    console.log('handleUpdateTask called:', { field, value, taskId: editingTask._id, brandId: currentBrand.id });
+    
+    setIsUpdatingTask(true);
     try {
-      setIsUpdatingTask(true);
-      
       let updateData: any = {};
+      
       switch (field) {
         case 'task':
           updateData = { task: value };
@@ -204,20 +229,55 @@ export default function TaskDetailsPanel({
           updateData = { status: value };
           setEditingTaskStatus(value);
           break;
+        case 'assignedTo':
+          updateData = { assignedTo: value };
+          setEditingTaskAssignee(value);
+          break;
         case 'eta':
           updateData = { eta: value };
+          setEditingTaskDueDate(value);
+          break;
+        case 'startDate':
+          updateData = { startDate: value };
+          break;
+        case 'dependencies':
+          updateData = { dependencies: value };
+          setSelectedDependencies(value);
           break;
         default:
           updateData = { [field]: value };
       }
       
-      if (Object.keys(updateData).length > 0) {
-        await apiService.updateBrandTask(currentBrand.id, selectedTask._id, updateData);
+      // Always update the task with the data
+      console.log('Updating task with data:', { brandId: currentBrand.id, taskId: editingTask._id, updateData });
+      const response = await apiService.updateBrandTask(currentBrand.id, editingTask._id, updateData);
+      
+      if (response.success) {
+        // Update the editing task with the response data
+        const updatedTask = { ...editingTask, ...updateData };
+        setEditingTask(updatedTask);
+        
+        // Call parent update to refresh the main task list
         onTaskChange(field, value);
         await onUpdateTask();
+        
+        // Force a small delay to ensure the update is processed
+        setTimeout(() => {
+          console.log('TaskDetailsPanel: Task update completed, UI should refresh');
+          // Trigger a window event to force refresh
+          window.dispatchEvent(new CustomEvent('taskUpdated', { 
+            detail: { taskId: editingTask._id, field, value } 
+          }));
+        }, 100);
+        
+        console.log('Task updated successfully:', field, value);
+      } else {
+        throw new Error(response.message || 'Failed to update task');
       }
+      
     } catch (error) {
       console.error('Error updating task:', error);
+      alert(`Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUpdatingTask(false);
     }
@@ -287,13 +347,13 @@ export default function TaskDetailsPanel({
 
   // Subtask handling
   const handleCreateSubtask = async () => {
-    if (!newSubtaskName.trim() || !selectedTask || !currentBrand) return;
+    if (!newSubtaskName.trim() || !currentTaskForSubtask || !currentBrand) return;
     
     try {
       setIsCreatingSubtask(true);
       
       const subtaskData = {
-        task_id: selectedTask._id,
+        task_id: currentTaskForSubtask,
         title: newSubtaskName.trim(),
         description: '',
         assignedTo: subtaskAssignee || selectedTask.assignedTo?._id,
@@ -302,20 +362,21 @@ export default function TaskDetailsPanel({
         priority: subtaskPriority,
         startDate: new Date().toISOString(),
         dueDate: selectedTask.eta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        order: (taskSubtasks[selectedTask._id]?.length || 0) + 1
+        order: (taskSubtasks[currentTaskForSubtask]?.length || 0) + 1
       };
       
       await apiService.createBrandSubtask(currentBrand.id, subtaskData);
-      await loadTaskSubtasks(selectedTask._id);
+      await loadTaskSubtasks(currentTaskForSubtask);
       
       // Reset form
       setNewSubtaskName('');
       setSubtaskAssignee('');
       setSubtaskStatus('Yet to Start');
       setSubtaskPriority('Low');
-      setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: false }));
+      setShowSubtaskInput(prev => ({ ...prev, [currentTaskForSubtask]: false }));
     } catch (error) {
       console.error('Error creating subtask:', error);
+      alert(`Error creating subtask: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsCreatingSubtask(false);
     }
@@ -341,12 +402,46 @@ export default function TaskDetailsPanel({
     
     try {
       setIsUpdatingSubtask(true);
-      await apiService.deleteSubtask(subtaskId);
+      await apiService.deleteBrandSubtask(currentBrand.id, subtaskId);
       if (selectedTask?._id) {
         await loadTaskSubtasks(selectedTask._id);
       }
     } catch (error) {
       console.error('Error deleting subtask:', error);
+    } finally {
+      setIsUpdatingSubtask(false);
+    }
+  };
+
+  const handleSaveSubtaskEdit = async () => {
+    if (!editingSubtaskId || !editingSubtaskTitle.trim() || !currentBrand) return;
+    
+    try {
+      setIsUpdatingSubtask(true);
+      
+      const updateData = {
+        title: editingSubtaskTitle.trim(),
+        priority: editingSubtaskPriority,
+        status: editingSubtaskStatus,
+        assignedTo: editingSubtaskAssignee || undefined
+      };
+      
+      await apiService.updateBrandSubtask(currentBrand.id, editingSubtaskId, updateData);
+      
+      // Reset editing state
+      setEditingSubtaskId(null);
+      setEditingSubtaskTitle('');
+      setEditingSubtaskPriority('Low');
+      setEditingSubtaskStatus('Yet to Start');
+      setEditingSubtaskAssignee('');
+      
+      // Refresh subtasks
+      if (selectedTask?._id) {
+        await loadTaskSubtasks(selectedTask._id);
+      }
+    } catch (error) {
+      console.error('Error updating subtask:', error);
+      alert(`Error updating subtask: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUpdatingSubtask(false);
     }
@@ -360,16 +455,16 @@ export default function TaskDetailsPanel({
       setIsAddingComment(true);
       
       const commentData = {
-        task_id: selectedTask._id,
         content: newComment.trim(),
-        author: currentBrand.id
+        entity_type: 'task',
+        entity_id: selectedTask._id
       };
       
-      await apiService.addTaskComment(currentBrand.id, selectedTask._id, commentData);
+      await apiService.createBrandComment(currentBrand.id, commentData);
       setNewComment('');
       
       // Refresh comments
-      const response = await apiService.getTaskComments(currentBrand.id, selectedTask._id);
+      const response = await apiService.getBrandComments(currentBrand.id);
       setTaskComments(response.data || response || []);
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -382,13 +477,31 @@ export default function TaskDetailsPanel({
     if (!confirm('Are you sure you want to delete this comment?')) return;
     
     try {
-      await apiService.deleteTaskComment(commentId);
+      await apiService.deleteBrandComment(currentBrand.id, commentId);
       if (selectedTask?._id && currentBrand?.id) {
-        const response = await apiService.getTaskComments(currentBrand.id, selectedTask._id);
+        const response = await apiService.getBrandComments(currentBrand.id);
         setTaskComments(response.data || response || []);
       }
     } catch (error) {
       console.error('Error deleting comment:', error);
+    }
+  };
+
+  // Load available dependencies (other tasks in the project)
+  const loadAvailableDependencies = async () => {
+    if (!currentBrand?.id || !projectId) return;
+    
+    try {
+      const response = await apiService.getProjectTasks(currentBrand.id, projectId);
+      if (response.success && response.data) {
+        const tasks = response.data.tasks || [];
+        // Filter out the current task
+        const otherTasks = tasks.filter((task: any) => task._id !== selectedTask?._id);
+        setAvailableDependencies(otherTasks);
+      }
+    } catch (error) {
+      console.error('Error loading dependencies:', error);
+      setAvailableDependencies([]);
     }
   };
 
@@ -419,6 +532,33 @@ export default function TaskDetailsPanel({
     }
   };
 
+  // Priority and Status options
+  const priorityOptions = [
+    { value: '', label: '—', color: 'text-gray-500' },
+    { value: 'Low', label: 'Low', color: 'bg-blue-100 text-blue-800' },
+    { value: 'Medium', label: 'Medium', color: 'bg-orange-100 text-orange-800' },
+    { value: 'High', label: 'High', color: 'bg-purple-100 text-purple-800' }
+  ];
+
+  const statusOptions = [
+    { value: 'Yet to Start', label: 'Yet to Start', color: 'bg-gray-100 text-gray-800' },
+    { value: 'In Progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
+    { value: 'Completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+    { value: 'Blocked', label: 'Blocked', color: 'bg-red-100 text-red-800' },
+    { value: 'On Hold', label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
+    { value: 'Cancelled', label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
+    { value: 'Recurring', label: 'Recurring', color: 'bg-purple-100 text-purple-800' }
+  ];
+
+  const handleFieldSelect = (field: string, value: string) => {
+    if (field === 'priority') {
+      setTaskPriority(value);
+    } else if (field === 'status') {
+      setTaskStatus(value);
+    }
+    setActiveField(null);
+  };
+
   if (!showTaskDetails || !selectedTask) {
     return null;
   }
@@ -439,7 +579,7 @@ export default function TaskDetailsPanel({
       </div>
 
       {/* Task Details Content */}
-      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* Task Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Task Name</label>
@@ -478,34 +618,315 @@ export default function TaskDetailsPanel({
         {/* Assignee */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Assignee</label>
-          <input
-            type="text"
-            placeholder="Name or email"
-            value={selectedTask.assignedTo?.name ? `${selectedTask.assignedTo.name} (${selectedTask.assignedTo.email})` : 'Unassigned'}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            disabled={isUpdatingTask}
-          />
+          <div className="relative assignee-dropdown">
+            <input
+              type="text"
+              placeholder="Name or email"
+              value={assigneeSearch}
+              onChange={(e) => {
+                setAssigneeSearch(e.target.value);
+                setShowAssigneeDropdown(true);
+              }}
+              onFocus={() => setShowAssigneeDropdown(true)}
+              onBlur={() => {
+                setTimeout(() => setShowAssigneeDropdown(false), 200);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              disabled={isUpdatingTask}
+            />
+            
+            {showAssigneeDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+                <div className="p-2">
+                  {/* Brand Users */}
+                  {Array.isArray(brandUsers) && brandUsers
+                    .filter(user => 
+                      user.name.toLowerCase().includes(assigneeSearch.toLowerCase()) ||
+                      user.email.toLowerCase().includes(assigneeSearch.toLowerCase())
+                    )
+                    .map((user) => (
+                      <div 
+                        key={user._id || user.id}
+                        onClick={() => handleAssigneeSelect(user)}
+                        className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                      >
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-medium text-sm">
+                            {user.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </div>
+                        <div className="text-xs text-gray-400">Brand User</div>
+                      </div>
+                    ))}
+                  
+                  {/* Email Option */}
+                  {assigneeSearch && isValidEmail(assigneeSearch) && (
+                    <div 
+                      onClick={() => handleAssigneeSelect(assigneeSearch, true)}
+                      className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer border-t border-gray-200"
+                    >
+                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <i className="ri-mail-line text-white text-sm"></i>
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">{assigneeSearch}</div>
+                        <div className="text-xs text-gray-500">Invite via email</div>
+                      </div>
+                      <div className="text-xs text-green-600">New User</div>
+                    </div>
+                  )}
+                  
+                  {Array.isArray(brandUsers) && brandUsers.length === 0 && !loadingBrandUsers && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No brand users found
+                    </div>
+                  )}
+                  
+                  {loadingBrandUsers && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      <i className="ri-loader-4-line animate-spin mr-2"></i>
+                      Loading users...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Date */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
           <div className="relative">
-            <button className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+            <button
+              onClick={() => {
+                setShowDatePicker(!showDatePicker);
+                setSelectingMode('due');
+              }}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              disabled={isUpdatingTask}
+            >
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                   <i className="ri-calendar-line text-blue-600 text-sm"></i>
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <div className="text-sm text-gray-600">
-                    Start: {selectedTask.startDate ? new Date(selectedTask.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
+                  {startDate && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500 font-medium">Start:</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatDate(startDate)}</span>
+                    </div>
+                  )}
+                  {dueDate && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500 font-medium">Due:</span>
+                      <span className="text-sm text-gray-900 font-medium">{formatDate(dueDate)}</span>
+                    </div>
+                  )}
+                  {!startDate && !dueDate && (
+                    <span className="text-sm text-gray-500">No dates set</span>
+                  )}
+                </div>
+              </div>
+              {dueDate && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDueDate(null);
+                    handleUpdateTask('eta', '');
+                  }}
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
+                  title="Clear due date"
+                >
+                  <i className="ri-close-line text-sm"></i>
+                </span>
+              )}
+            </button>
+            
+            {showDatePicker && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 date-picker">
+                {/* Date Input Fields - Top Section */}
+                <div className="p-3 border-b border-gray-200">
+                  <div className="flex space-x-2">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <button
+                          onClick={() => setSelectingMode('start')}
+                          className={`w-full px-2 py-1 text-sm border rounded text-left ${
+                            selectingMode === 'start' 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {formatDateInput(startDate) || 'Start date'}
+                        </button>
+                        {startDate && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStartDate(null);
+                            }}
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                            title="Clear start date"
+                          >
+                            <i className="ri-close-line text-xs"></i>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="relative">
+                        <button
+                          onClick={() => setSelectingMode('due')}
+                          className={`w-full px-2 py-1 text-sm border rounded text-left ${
+                            selectingMode === 'due' 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {formatDateInput(dueDate) || 'Due date'}
+                        </button>
+                        {dueDate && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDueDate(null);
+                            }}
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
+                            title="Clear due date"
+                          >
+                            <i className="ri-close-line text-xs"></i>
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600">
-                    Due: {selectedTask.eta ? new Date(selectedTask.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
+                </div>
+
+                {/* Calendar Header */}
+                <div className="flex items-center justify-between p-3 border-b border-gray-200">
+                  <button
+                    onClick={() => navigateMonth('prev')}
+                    className="p-1 hover:bg-gray-100 rounded"
+                  >
+                    <i className="ri-arrow-left-s-line text-gray-600"></i>
+                  </button>
+                  <div className="text-center">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {selectingMode === 'start' ? 'Select start date' : 'Select due date'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigateMonth('next')}
+                    className="p-1 hover:bg-gray-100 rounded"
+                  >
+                    <i className="ri-arrow-right-s-line text-gray-600"></i>
+                  </button>
+                </div>
+                
+                {/* Calendar Grid */}
+                <div className="p-3">
+                  {/* Day headers */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                      <div key={day} className="text-xs text-gray-500 text-center py-1">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Calendar days */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {(() => {
+                      const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
+                      const days = [];
+                      
+                      // Empty cells for days before month starts
+                      for (let i = 0; i < startingDayOfWeek; i++) {
+                        days.push(<div key={`empty-${i}`} className="h-8"></div>);
+                      }
+                      
+                      // Days of the month
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                        
+                        const isStartDate = startDate && 
+                          startDate.getDate() === day && 
+                          startDate.getMonth() === currentMonth.getMonth() && 
+                          startDate.getFullYear() === currentMonth.getFullYear();
+                        
+                        const isDueDate = dueDate && 
+                          dueDate.getDate() === day && 
+                          dueDate.getMonth() === currentMonth.getMonth() && 
+                          dueDate.getFullYear() === currentMonth.getFullYear();
+                        
+                        const isInRange = startDate && dueDate && 
+                          currentDate >= startDate && currentDate <= dueDate;
+                        
+                        const isToday = new Date().toDateString() === currentDate.toDateString();
+                        
+                        let className = 'h-8 w-8 text-sm rounded hover:bg-gray-100 ';
+                        
+                        if (isStartDate || isDueDate) {
+                          className += 'bg-blue-500 text-white hover:bg-blue-600 font-medium';
+                        } else if (isInRange) {
+                          className += 'bg-blue-100 text-blue-800 hover:bg-blue-200';
+                        } else if (isToday) {
+                          className += 'bg-blue-50 text-blue-700 font-medium hover:bg-blue-100';
+                        } else {
+                          className += 'text-gray-700 hover:bg-gray-100';
+                        }
+                        
+                        days.push(
+                          <button
+                            key={day}
+                            onClick={() => handleDateSelect(day)}
+                            className={className}
+                          >
+                            {day}
+                          </button>
+                        );
+                      }
+                      
+                      return days;
+                    })()}
+                  </div>
+                </div>
+                
+                {/* Footer buttons */}
+                <div className="border-t border-gray-200 p-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <button className="p-1 text-gray-400 hover:text-gray-600">
+                      <i className="ri-time-line text-sm"></i>
+                    </button>
+                    <button className="p-1 text-gray-400 hover:text-gray-600">
+                      <i className="ri-chat-3-line text-sm"></i>
+                    </button>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleClearDates}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={handleSaveDates}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
                   </div>
                 </div>
               </div>
-            </button>
+            )}
           </div>
         </div>
 
@@ -520,20 +941,40 @@ export default function TaskDetailsPanel({
                 <span className="text-sm text-gray-700">Priority</span>
               </div>
               <div className="relative">
-                <select
-                  value={editingTaskPriority}
-                  onChange={(e) => {
-                    setEditingTaskPriority(e.target.value);
-                    handleUpdateTask('priority', e.target.value);
-                  }}
+                <button
+                  onClick={() => setActiveField(activeField === 'priority' ? null : 'priority')}
                   className={`px-3 py-1 rounded text-sm font-medium ${getPriorityColor(editingTaskPriority)} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   disabled={isUpdatingTask}
                 >
-                  <option value="">—</option>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
+                  {editingTaskPriority || '—'}
+                </button>
+                
+                {activeField === 'priority' && (
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 field-dropdown min-w-48">
+                    <div className="py-1">
+                      {priorityOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            handleFieldSelect('priority', option.value);
+                            handleUpdateTask('priority', option.value);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                            editingTaskPriority === option.value ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            {option.value && <span className={`px-2 py-1 rounded text-xs font-medium ${option.color}`}>{option.label}</span>}
+                            {!option.value && <span className="text-gray-500">{option.label}</span>}
+                          </div>
+                          {editingTaskPriority === option.value && (
+                            <i className="ri-check-line text-green-600"></i>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -544,21 +985,40 @@ export default function TaskDetailsPanel({
                 <span className="text-sm text-gray-700">Status</span>
               </div>
               <div className="relative">
-                <select
-                  value={editingTaskStatus}
-                  onChange={(e) => {
-                    setEditingTaskStatus(e.target.value);
-                    handleUpdateTask('status', e.target.value);
-                  }}
+                <button
+                  onClick={() => setActiveField(activeField === 'status' ? null : 'status')}
                   className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(editingTaskStatus)} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-1`}
                   disabled={isUpdatingTask}
                 >
-                  <option value="Yet to Start">Yet to Start</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Blocked">Blocked</option>
-                  <option value="On Hold">On Hold</option>
-                </select>
+                  <span>{editingTaskStatus}</span>
+                  <i className="ri-arrow-down-s-line text-xs"></i>
+                </button>
+                
+                {activeField === 'status' && (
+                  <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 field-dropdown min-w-48">
+                    <div className="py-1">
+                      {statusOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            handleFieldSelect('status', option.value);
+                            handleUpdateTask('status', option.value);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between ${
+                            editingTaskStatus === option.value ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${option.color}`}>{option.label}</span>
+                          </div>
+                          {editingTaskStatus === option.value && (
+                            <i className="ri-check-line text-green-600"></i>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -573,6 +1033,7 @@ export default function TaskDetailsPanel({
               onChange={(e) => setEditingTaskDescription(e.target.value)}
               onBlur={() => {
                 if (editingTaskDescription !== selectedTask?.description && editingTaskDescription.trim()) {
+                  console.log('Saving description:', editingTaskDescription.trim());
                   handleUpdateTask('description', editingTaskDescription.trim());
                 }
               }}
@@ -636,70 +1097,328 @@ export default function TaskDetailsPanel({
         <div>
           <div className="flex items-center justify-between mb-3">
             <label className="block text-sm font-medium text-gray-700">Dependencies</label>
-            <button className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50">
+            <button 
+              onClick={() => setShowDependenciesDropdown(!showDependenciesDropdown)}
+              className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+            >
               <i className="ri-add-line mr-1"></i>
               Add dependency
             </button>
           </div>
-          <div className="text-center py-4 text-gray-500 text-sm">
-            <i className="ri-links-line text-lg mb-1"></i>
-            <div>No dependencies set</div>
-          </div>
+          
+          {showDependenciesDropdown && (
+            <div className="mb-3 p-3 border border-gray-200 rounded-md bg-gray-50">
+              <div className="text-sm text-gray-600 mb-2">Select tasks that this task depends on:</div>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {availableDependencies.map((task) => (
+                  <label key={task._id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedDependencies.includes(task._id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDependencies([...selectedDependencies, task._id]);
+                        } else {
+                          setSelectedDependencies(selectedDependencies.filter(id => id !== task._id));
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">{task.task}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <button
+                  onClick={() => setShowDependenciesDropdown(false)}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleUpdateTask('dependencies', selectedDependencies);
+                    setShowDependenciesDropdown(false);
+                  }}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Save Dependencies
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {selectedDependencies.length > 0 ? (
+            <div className="space-y-2">
+              {selectedDependencies.map((depId) => {
+                const depTask = availableDependencies.find(t => t._id === depId);
+                return depTask ? (
+                  <div key={depId} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <span className="text-sm text-gray-700">{depTask.task}</span>
+                    <button
+                      onClick={() => {
+                        const newDeps = selectedDependencies.filter(id => id !== depId);
+                        setSelectedDependencies(newDeps);
+                        handleUpdateTask('dependencies', newDeps);
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <i className="ri-close-line text-sm"></i>
+                    </button>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">
+              <i className="ri-links-line text-lg mb-1"></i>
+              <div>No dependencies set</div>
+            </div>
+          )}
         </div>
 
         {/* Subtasks */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-medium text-gray-700">Subtasks (0)</label>
-            <button className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50">
+            <label className="block text-sm font-medium text-gray-700">
+              Subtasks ({taskSubtasks[selectedTask._id]?.length || 0})
+            </label>
+            <button 
+              onClick={() => {
+                setCurrentTaskForSubtask(selectedTask._id);
+                setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: true }));
+              }}
+              className="px-3 py-1 text-sm text-blue-600 border border-blue-300 rounded hover:bg-blue-50"
+            >
               <i className="ri-add-line mr-1"></i>
               Add subtask
             </button>
           </div>
-          <div className="text-center py-4 text-gray-500 text-sm">
-            No subtasks yet
-          </div>
-        </div>
-
-        {/* Comments */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-medium text-gray-700">Comments</label>
-            <span className="text-sm text-gray-500">0 comments</span>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-2">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                SM
-              </div>
-              <div className="flex-1">
-                <textarea
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                  rows={2}
-                  placeholder="Write a comment..."
+          
+          {/* Add Subtask Form */}
+          {showSubtaskInput[selectedTask._id] && (
+            <div className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50">
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Subtask name"
+                  value={newSubtaskName}
+                  onChange={(e) => setNewSubtaskName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-gray-500">Press Ctrl+Enter to save</span>
-                  <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                    Add Comment
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    value={subtaskPriority}
+                    onChange={(e) => setSubtaskPriority(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="Low">Low Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="High">High Priority</option>
+                  </select>
+                  <select
+                    value={subtaskStatus}
+                    onChange={(e) => setSubtaskStatus(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="Yet to Start">Yet to Start</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                  <select
+                    value={subtaskAssignee}
+                    onChange={(e) => setSubtaskAssignee(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="">Unassigned</option>
+                    {brandUsers.map(user => (
+                      <option key={user._id || user.id} value={user._id || user.id}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setShowSubtaskInput(prev => ({ ...prev, [selectedTask._id]: false }));
+                      setNewSubtaskName('');
+                    }}
+                    className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateSubtask}
+                    disabled={!newSubtaskName.trim() || isCreatingSubtask}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-1"
+                  >
+                    {isCreatingSubtask ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin text-xs"></i>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-add-line text-xs"></i>
+                        <span>Add Subtask</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+          
+          {/* Subtasks List */}
+          {taskSubtasks[selectedTask._id] && taskSubtasks[selectedTask._id].length > 0 ? (
+            <div className="space-y-1">
+              {taskSubtasks[selectedTask._id].map((subtask) => (
+                <div key={subtask._id}>
+                  {/* Edit Subtask Form */}
+                  {editingSubtaskId === subtask._id ? (
+                    <div className="p-3 border border-blue-200 rounded-md bg-blue-50">
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={editingSubtaskTitle}
+                          onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Subtask name"
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={editingSubtaskPriority}
+                            onChange={(e) => setEditingSubtaskPriority(e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="Low">Low Priority</option>
+                            <option value="Medium">Medium Priority</option>
+                            <option value="High">High Priority</option>
+                          </select>
+                          <select
+                            value={editingSubtaskStatus}
+                            onChange={(e) => setEditingSubtaskStatus(e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="Yet to Start">Yet to Start</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                          <select
+                            value={editingSubtaskAssignee}
+                            onChange={(e) => setEditingSubtaskAssignee(e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">Unassigned</option>
+                            {brandUsers.map(user => (
+                              <option key={user._id || user.id} value={user._id || user.id}>
+                                {user.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => {
+                              setEditingSubtaskId(null);
+                              setEditingSubtaskTitle('');
+                              setEditingSubtaskPriority('Low');
+                              setEditingSubtaskStatus('Yet to Start');
+                              setEditingSubtaskAssignee('');
+                            }}
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveSubtaskEdit}
+                            disabled={!editingSubtaskTitle.trim() || isUpdatingSubtask}
+                            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center space-x-1"
+                          >
+                            {isUpdatingSubtask ? (
+                              <>
+                                <i className="ri-loader-4-line animate-spin text-xs"></i>
+                                <span>Saving...</span>
+                              </>
+                            ) : (
+                              <>
+                                <i className="ri-check-line text-xs"></i>
+                                <span>Save</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Normal Subtask Display */
+                    <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                      <div className="flex items-center space-x-2 flex-1">
+                        <button
+                          onClick={() => handleSubtaskComplete(subtask._id, subtask.status !== 'Completed')}
+                          className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                        >
+                          {subtask.status === 'Completed' ? (
+                            <i className="ri-check-line text-xs text-green-600"></i>
+                          ) : (
+                            <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                          )}
+                        </button>
+                        <span className={`text-sm ${subtask.status === 'Completed' ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                          {subtask.title || subtask.task}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(subtask.priority)}`}>
+                          {subtask.priority}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(subtask.status)}`}>
+                          {subtask.status}
+                        </span>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => {
+                              setEditingSubtask(subtask);
+                              setEditingSubtaskId(subtask._id);
+                              setEditingSubtaskTitle(subtask.title || subtask.task);
+                              setEditingSubtaskPriority(subtask.priority);
+                              setEditingSubtaskStatus(subtask.status);
+                              setEditingSubtaskAssignee(subtask.assignedTo || '');
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600"
+                            title="Edit subtask"
+                          >
+                            <i className="ri-edit-line text-sm"></i>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSubtask(subtask._id)}
+                            className="p-1 text-red-400 hover:text-red-600"
+                            title="Delete subtask"
+                          >
+                            <i className="ri-delete-bin-line text-sm"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">
+              <i className="ri-list-check text-lg mb-1"></i>
+              <div>No subtasks yet</div>
+            </div>
+          )}
         </div>
 
-        {/* Collaborators */}
+        {/* Comments Section */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Collaborators</label>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-              S
-            </div>
-            <button className="w-8 h-8 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 hover:border-gray-400">
-              <i className="ri-add-line"></i>
-            </button>
-          </div>
+          <DynamicCommentsSection 
+            taskId={selectedTask._id}
+            currentUser={currentBrand}
+          />
         </div>
       </div>
 
