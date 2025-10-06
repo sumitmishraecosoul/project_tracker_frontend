@@ -220,12 +220,12 @@ export default function CategoryTaskSections({
           {/* Header */}
           <div className="grid grid-cols-12 gap-1 text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
             <div className="col-span-1">Check</div>
-            <div className="col-span-3">Name</div>
+            <div className="col-span-2">Name</div>
             <div className="col-span-2">Assignee</div>
             <div className="col-span-2">Start Date</div>
             <div className="col-span-2">Due Date</div>
             <div className="col-span-1">Priority</div>
-            <div className="col-span-1">Status</div>
+            <div className="col-span-2 text-center">Status</div>
           </div>
           
           {/* Test Task Row */}
@@ -235,7 +235,7 @@ export default function CategoryTaskSections({
                 <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
               </button>
             </div>
-            <div className="col-span-3 flex items-center space-x-0.5">
+            <div className="col-span-2 flex items-center space-x-0.5">
               <span className="text-sm text-gray-900 truncate">Test Task Name</span>
             </div>
             <div className="col-span-2">
@@ -255,7 +255,7 @@ export default function CategoryTaskSections({
             <div className="col-span-1">
               <span className="px-0.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Low</span>
             </div>
-            <div className="col-span-1 flex items-center">
+            <div className="col-span-2 flex items-center justify-center">
               <select className="px-1 py-1 rounded text-xs font-medium border-0 bg-transparent bg-gray-100 text-gray-800">
                 <option value="Yet to Start">Yet to Start</option>
               </select>
@@ -347,7 +347,7 @@ export default function CategoryTaskSections({
                             )}
                           </button>
                         </div>
-                        <div className="col-span-3 flex items-center space-x-0.5">
+                        <div className="col-span-2 flex items-center space-x-0.5">
                           {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
                             <button 
                               onClick={(e) => {
@@ -385,7 +385,7 @@ export default function CategoryTaskSections({
                             {task.priority}
                           </span>
                         </div>
-                        <div className="col-span-1 flex items-center">
+                        <div className="col-span-2 flex items-center justify-center">
                           <select 
                             value={task.status}
                             onChange={(e) => {
@@ -467,7 +467,7 @@ export default function CategoryTaskSections({
                           <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
                         </div>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <input
                           type="text"
                           placeholder={isCreatingTask ? "Creating task..." : "Write a task name"}
@@ -528,7 +528,7 @@ export default function CategoryTaskSections({
                           <option value="High">High</option>
                         </select>
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2">
                         <select
                           value={newTaskStatus}
                           onChange={(e) => setNewTaskStatus(e.target.value)}
