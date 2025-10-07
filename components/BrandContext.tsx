@@ -39,8 +39,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       
-      // Load brands from API
-      await getBrands();
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Brand loading timeout')), 10000); // 10 second timeout
+      });
+      
+      // Load brands from API with timeout
+      await Promise.race([getBrands(), timeoutPromise]);
       
       // Load current brand from localStorage
       const savedCurrentBrand = localStorage.getItem('currentBrand');
@@ -75,12 +80,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setBrands(response.data || []);
         setError(null);
       } else {
+        console.error('BrandContext - API returned error:', response.message);
         setError(response.message || 'Failed to load brands');
+        // Don't throw error here - let the context continue with empty brands
       }
     } catch (error: any) {
-      console.error('Error fetching brands:', error);
+      console.error('BrandContext - Error fetching brands:', error);
       setError(error.message || 'Failed to load brands');
-      throw error;
+      // Don't throw error here - let the context continue with empty brands
+      // This prevents the component from getting stuck in loading state
     }
   };
 

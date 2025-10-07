@@ -453,7 +453,8 @@ export default function CategoryTaskSections({
                               task.status === 'Blocked' ? 'bg-red-100 text-red-800' : 
                               task.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' : 
                               task.status === 'Cancelled' ? 'bg-gray-100 text-gray-800' : 
-                              'bg-purple-100 text-purple-800'
+                              task.status === 'Recurring' ? 'bg-purple-100 text-purple-800' : 
+                              'bg-gray-100 text-gray-800'
                             }`}
                           >
                             <option value="Yet to Start">Yet to Start</option>

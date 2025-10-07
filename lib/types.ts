@@ -16,7 +16,7 @@ export interface Task {
   task: string;
   description?: string;
   category_id: string; // NEW: Required field for category
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: {
     _id: string;
@@ -63,7 +63,7 @@ export interface NewTask {
   description?: string;
   taskType: 'Daily' | 'Weekly' | 'Monthly' | 'Adhoc';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   assignedTo: string;
   reporter: string;
   startDate?: string;
@@ -348,7 +348,7 @@ export interface CreateTaskData {
   category_id: string; // NEW: Required field for category
   assignedTo: string;
   reporter: string;
-  status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   eta: string;
 }
@@ -356,7 +356,7 @@ export interface CreateTaskData {
 export interface UpdateTaskData {
   task?: string;
   description?: string;
-  status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   reporter?: string;
@@ -406,7 +406,7 @@ export interface Subtask {
   id: string;
   task: string;
   description?: string;
-  status: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: {
     _id: string;
@@ -450,7 +450,7 @@ export interface CreateSubtaskData {
   parentTaskId?: string;
   assignedTo?: string;
   reporter?: string;
-  status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   eta?: string;
   order?: number;
@@ -465,7 +465,7 @@ export interface CreateSubtaskData {
 export interface UpdateSubtaskData {
   task?: string;
   description?: string;
-  status?: 'Yet to Start' | 'In Progress' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
+  status?: 'Yet to Start' | 'In Progress' | 'Under Review' | 'Completed' | 'Blocked' | 'On Hold' | 'Cancelled' | 'Recurring';
   priority?: 'Critical' | 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   reporter?: string;

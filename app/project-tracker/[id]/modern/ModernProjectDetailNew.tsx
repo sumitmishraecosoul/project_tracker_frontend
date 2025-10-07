@@ -310,7 +310,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     currentBrandId: currentBrand?.id 
   });
 
-  // Loading state
+  // Loading state with timeout
   if (loading || brandLoading) {
     return (
       <VerticalLayout>
@@ -318,6 +318,9 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p className="ml-3 text-gray-600">
             {brandLoading ? 'Loading brand...' : 'Loading project...'}
+          </p>
+          <p className="ml-3 text-sm text-gray-500">
+            If this takes too long, please check your connection or refresh the page.
           </p>
         </div>
       </VerticalLayout>
