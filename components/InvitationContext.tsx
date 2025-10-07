@@ -45,7 +45,7 @@ export function InvitationProvider({ children }: { children: ReactNode }) {
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { currentBrand } = useBrand();
+  const { currentBrand, getBrands } = useBrand();
 
   const getPendingInvitations = async (brandId: string) => {
     try {
@@ -104,6 +104,10 @@ export function InvitationProvider({ children }: { children: ReactNode }) {
         // Remove from local state
         setPendingInvitations(prev => prev.filter(inv => inv.id !== invitationId));
         console.log('InvitationContext - Invitation accepted successfully');
+        
+        // Refresh brands list to show the new brand in the brand switcher
+        console.log('InvitationContext - Refreshing brands list to show new brand...');
+        await getBrands();
         
         // Refresh invitations to get updated list (use user API, not brand API)
         await getPendingInvitations(brandId);

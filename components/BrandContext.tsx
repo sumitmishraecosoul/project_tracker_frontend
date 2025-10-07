@@ -35,28 +35,40 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
   const initializeBrands = async () => {
     try {
+      console.log('BrandContext: Starting brand initialization');
       setIsLoading(true);
       setError(null);
       
-      // Load brands from API
-      await getBrands();
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Brand loading timeout')), 10000); // 10 second timeout
+      });
+      
+      // Load brands from API with timeout
+      await Promise.race([getBrands(), timeoutPromise]);
       
       // Load current brand from localStorage
       const savedCurrentBrand = localStorage.getItem('currentBrand');
+      console.log('BrandContext: Saved current brand from localStorage:', savedCurrentBrand);
       if (savedCurrentBrand) {
         try {
           const brand = JSON.parse(savedCurrentBrand);
+          console.log('BrandContext: Parsed brand:', brand);
           setCurrentBrand(brand);
           setSelectedBrand(brand); // Set as selected for UI compatibility
+          console.log('BrandContext: Set current brand to:', brand);
         } catch (parseError) {
           console.error('Error parsing saved current brand:', parseError);
           localStorage.removeItem('currentBrand');
         }
+      } else {
+        console.log('BrandContext: No saved current brand found');
       }
     } catch (error) {
       console.error('Error initializing brands:', error);
       setError('Failed to load brands');
     } finally {
+      console.log('BrandContext: Brand initialization complete, setting isLoading to false');
       setIsLoading(false);
     }
   };
@@ -68,12 +80,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setBrands(response.data || []);
         setError(null);
       } else {
+        console.error('BrandContext - API returned error:', response.message);
         setError(response.message || 'Failed to load brands');
+        // Don't throw error here - let the context continue with empty brands
       }
     } catch (error: any) {
-      console.error('Error fetching brands:', error);
+      console.error('BrandContext - Error fetching brands:', error);
       setError(error.message || 'Failed to load brands');
-      throw error;
+      // Don't throw error here - let the context continue with empty brands
+      // This prevents the component from getting stuck in loading state
     }
   };
 

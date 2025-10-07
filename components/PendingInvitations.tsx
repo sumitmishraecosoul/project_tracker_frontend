@@ -47,6 +47,7 @@ export default function PendingInvitations({
   } = useInvitations();
   const { currentBrand } = useBrand();
   const [processing, setProcessing] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
 
   const handleAcceptInvitation = async (invitationId: string) => {
     // Find the invitation to get the correct brand ID
@@ -60,6 +61,13 @@ export default function PendingInvitations({
       setProcessing(invitationId);
       console.log('PendingInvitations - Accepting invitation for brand:', invitation.brand.id);
       await acceptInvitation(invitation.brand.id, invitationId);
+      
+      // Show success message
+      console.log('✅ Invitation accepted! Brand has been added to your brand list.');
+      setSuccessMessage(`✅ Successfully joined ${invitation.brand.name}! The brand is now available in your brand switcher.`);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(null), 5000);
       
       // Notify parent component
       if (onInvitationAccepted) {
@@ -227,6 +235,15 @@ export default function PendingInvitations({
           <div className="flex items-center">
             <i className="ri-error-warning-line mr-2"></i>
             <span>{error}</span>
+          </div>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+          <div className="flex items-center">
+            <i className="ri-check-line mr-2"></i>
+            <span>{successMessage}</span>
           </div>
         </div>
       )}

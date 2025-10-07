@@ -116,7 +116,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     manager?: string;
   }) => {
     try {
-      await apiService.register(userData);
+      await apiService.signup({
+        ...userData,
+        role: userData.role as 'admin' | 'brand_admin' | 'user'
+      });
       // Registration successful, user needs to login
     } catch (error) {
       console.error('Registration error:', error);

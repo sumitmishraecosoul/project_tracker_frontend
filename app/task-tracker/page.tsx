@@ -134,18 +134,27 @@ export default function TaskTracker() {
         if (departmentFilter === 'All Departments') {
           // Admin with "All Departments" - show all users
           const allUsers = await apiService.getUsers();
-          usersData = Array.isArray(allUsers) ? allUsers : [];
+          usersData = Array.isArray(allUsers) ? allUsers.map(user => ({
+            ...user,
+            role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+          })) : [];
         } else {
           // Admin with specific department - filter users by department
           const allUsers = await apiService.getUsers();
-          usersData = Array.isArray(allUsers) ? allUsers.filter(user => user.department === departmentFilter) : [];
+          usersData = Array.isArray(allUsers) ? allUsers.filter(user => user.department === departmentFilter).map(user => ({
+            ...user,
+            role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+          })) : [];
         }
-        setUsers(usersData as User[]);
+        setUsers(usersData);
       } else {
         // Manager/Employee: use my-team endpoint to get same department users
         const data = await apiService.getMyTeam();
-        usersData = Array.isArray(data) ? data : [];
-        setUsers(usersData as User[]);
+        usersData = Array.isArray(data) ? data.map(user => ({
+          ...user,
+          role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+        })) : [];
+        setUsers(usersData);
       }
       
       // Set first user as active if available

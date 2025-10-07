@@ -646,7 +646,8 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
           reporter: userId, // Use current user ID as default reporter
           eta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Default to 7 days from now
           status: 'Yet to Start',
-          priority: 'Medium'
+          priority: 'Medium',
+          category_id: 'default-category'
         };
         
         console.log('Creating new task with data:', {
@@ -3062,7 +3063,6 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   <div>
                     <DynamicCommentsSection
                       taskId={selectedTask._id}
-                      brandId={currentBrand?.id || '68d38eed5a9174ab9e766851'}
                       currentUser={{
                         id: currentUser?.id || 'user1',
                         name: currentUser?.name || 'Sumit Mishra',

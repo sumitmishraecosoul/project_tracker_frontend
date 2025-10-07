@@ -112,7 +112,16 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       console.log('TaskContext - Create task response:', response);
       
       if (response.success && response.data) {
-        const newTask = response.data.task;
+        // For task creation, the task is directly in response.data
+        const newTask = response.data;
+        console.log('TaskContext - New task data:', newTask);
+        console.log('TaskContext - New task properties:', {
+          id: newTask._id,
+          task: newTask.task,
+          category_id: newTask.category_id,
+          brand_id: newTask.brand_id,
+          projectId: newTask.projectId
+        });
         setTasks(prev => [...prev, newTask]);
         console.log('TaskContext - Added new task to list:', newTask);
         return newTask;
@@ -241,9 +250,12 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
       console.log('TaskContext - Updating task status:', { brandId, taskId, status });
       const response = await apiService.updateBrandTaskStatus(brandId, taskId, status);
       console.log('TaskContext - Update task status response:', response);
+      console.log('TaskContext - Response success:', response?.success);
+      console.log('TaskContext - Response data:', response?.data);
       
       if (response.success && response.data) {
         const updatedTask = response.data.task;
+        console.log('TaskContext - Updated task from API:', updatedTask);
         setTasks(prev => prev.map(task => task._id === updatedTask._id ? updatedTask : task));
         if (currentTask && currentTask._id === updatedTask._id) {
           setCurrentTask(updatedTask);
@@ -251,6 +263,7 @@ export const TaskProvider: React.FC<TaskProviderProps> = ({ children }) => {
         console.log('TaskContext - Updated task status:', updatedTask);
         return updatedTask;
       } else {
+        console.error('TaskContext - Status update failed:', response);
         throw new Error(response.message || 'Failed to update task status');
       }
     } catch (error: any) {

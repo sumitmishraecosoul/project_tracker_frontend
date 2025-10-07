@@ -35,6 +35,8 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
       console.log('BrandUserContext - API response.data:', response.data);
       console.log('BrandUserContext - API response.data type:', typeof response.data);
       console.log('BrandUserContext - API response.data length:', Array.isArray(response.data) ? response.data.length : 'Not an array');
+      console.log('BrandUserContext - API response.error:', response.error);
+      console.log('BrandUserContext - API response.message:', response.message);
       
       if (response.success) {
         const users = response.data || [];
@@ -44,6 +46,8 @@ export function BrandUserProvider({ children }: { children: ReactNode }) {
         setBrandUsers(users);
       } else {
         console.error('BrandUserContext - API error:', response.message);
+        console.error('BrandUserContext - API error details:', response.error);
+        
         setError(response.message || 'Failed to load brand users');
       }
     } catch (error: any) {

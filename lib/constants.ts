@@ -20,15 +20,22 @@ export const DEPARTMENTS = [
 // Default department as per backend
 export const DEFAULT_DEPARTMENT = 'India E-commerce';
 
-// Role system
-export const ROLES = ['admin', 'manager', 'employee'] as const;
+// Role system - Updated for Category & Role System
+export const ROLES = ['admin', 'brand_admin', 'user'] as const;
 
 // Default role as per backend
-export const DEFAULT_ROLE = 'employee';
+export const DEFAULT_ROLE = 'user';
 
 // User-friendly role labels
 export const ROLE_LABELS = {
-  admin: 'Administrator',
-  manager: 'Manager',
-  employee: 'Employee'
+  admin: 'System Administrator',
+  brand_admin: 'Brand Administrator', 
+  user: 'User'
+} as const;
+
+// Role descriptions for signup form
+export const ROLE_DESCRIPTIONS = {
+  admin: 'Full system access - can see all brands and manage everything',
+  brand_admin: 'Can create and manage brands, invite users to brands',
+  user: 'Can only access brands you are invited to'
 } as const;

@@ -122,15 +122,24 @@ export default function AddUserTaskModal({ userId, projectId, onAdd, onClose }: 
       if (currentUser?.role === 'admin') {
         // Admin can see all users
         const data = await apiService.getUsers();
-        usersData = Array.isArray(data) ? data : [];
+        usersData = Array.isArray(data) ? data.map(user => ({
+          ...user,
+          role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+        })) : [];
       } else if (currentUser?.role === 'manager' || currentUser?.role === 'employee') {
         // Manager and employee can only see users from their department
         const data = await apiService.getUsers();
-        usersData = Array.isArray(data) ? data.filter(user => user.department === currentUser.department) : [];
+        usersData = Array.isArray(data) ? data.filter(user => user.department === currentUser.department).map(user => ({
+          ...user,
+          role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+        })) : [];
       } else {
         // Fallback to assignable users endpoint
         const data = await apiService.getAssignableUsers();
-        usersData = Array.isArray(data) ? data : [];
+        usersData = Array.isArray(data) ? data.map(user => ({
+          ...user,
+          role: user.role as 'admin' | 'brand_admin' | 'user' | undefined
+        })) : [];
       }
       
       setUsers(usersData);

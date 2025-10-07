@@ -1,4 +1,4 @@
-import ProjectDetail from './ProjectDetail';
+import ModernProjectDetailNew from './modern/ModernProjectDetailNew';
 
 export async function generateStaticParams() {
   return [
@@ -10,6 +10,6 @@ export async function generateStaticParams() {
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  console.log('ProjectPage component - received project ID:', id);
-  return <ProjectDetail projectId={id} />;
+  console.log('Server  ModernProjectPage component - received project ID:', id);
+  return <ModernProjectDetailNew projectId={id} />;
 }
