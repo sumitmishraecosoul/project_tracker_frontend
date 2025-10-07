@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../lib/api-service';
 import DynamicCommentsSection from './DynamicCommentsSection';
 import TaskLinksSection from './TaskLinksSection';
@@ -82,16 +82,35 @@ export default function TaskDetailsPanel({
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [taskComments, setTaskComments] = useState<any[]>([]);
+  
+  // Track if we're updating status locally to prevent overwriting from parent
+  const isLocalStatusUpdate = useRef(false);
+  const pendingStatusUpdate = useRef<string | null>(null);
+  
+  // Project information
+  const [projectInfo, setProjectInfo] = useState<any>(null);
 
   // Initialize editing states when selectedTask changes
   useEffect(() => {
     if (selectedTask) {
-      console.log('TaskDetailsPanel: Updating editing states with selectedTask:', selectedTask);
+      console.log('🔵 MAIN EFFECT RUNNING');
+      console.log('🔵 isLocalStatusUpdate.current:', isLocalStatusUpdate.current);
+      console.log('🔵 selectedTask.status:', selectedTask.status);
+      console.log('🔵 Current editingTaskStatus:', editingTaskStatus);
+      
       setEditingTask(selectedTask);
       setEditingTaskName(selectedTask.task || '');
       setEditingTaskDescription(selectedTask.description || '');
       setEditingTaskPriority(selectedTask.priority || '');
-      setEditingTaskStatus(selectedTask.status || '');
+      
+      // Only update status if not doing a local update AND if it's actually different
+      if (!isLocalStatusUpdate.current && !pendingStatusUpdate.current) {
+        console.log('🔵 RESETTING STATUS to:', selectedTask.status);
+        setEditingTaskStatus(selectedTask.status || '');
+      } else {
+        console.log('🔵 SKIPPING status reset (flag or pending status set)');
+      }
+      
       setEditingTaskAssignee(selectedTask.assignedTo?.id || selectedTask.assignedTo || '');
       
       // Set assignee display
@@ -152,6 +171,12 @@ export default function TaskDetailsPanel({
         loadAvailableDependencies();
       }
       
+      // Load project information
+      const taskProjectId = selectedTask.projectId || projectId;
+      if (taskProjectId) {
+        loadProjectInfo(taskProjectId);
+      }
+      
       // Set assignee search
       if (selectedTask.assignedTo?.name) {
         setAssigneeSearch(`${selectedTask.assignedTo.name} (${selectedTask.assignedTo.email})`);
@@ -161,15 +186,26 @@ export default function TaskDetailsPanel({
     }
   }, [selectedTask, selectedTask?._lastUpdated, currentBrand]);
 
-  // Watch for status changes specifically
+  // Watch for status changes from parent - only update if not from local update
   useEffect(() => {
-    if (selectedTask && selectedTask.status !== editingTaskStatus) {
-      console.log('TaskDetailsPanel: Status changed in selectedTask, updating editingTaskStatus');
-      console.log('Previous status:', editingTaskStatus, 'New status:', selectedTask.status);
-      setEditingTaskStatus(selectedTask.status);
-      setEditingTask(selectedTask);
+    if (selectedTask && selectedTask.status) {
+      // If this is a local update in progress, don't override
+      if (isLocalStatusUpdate.current) {
+        return; // Don't reset the flag here - let the timeout handle it
+      }
+      
+      // If pendingStatusUpdate matches selectedTask.status, we can clear it now
+      if (pendingStatusUpdate.current && pendingStatusUpdate.current === selectedTask.status) {
+        console.log('🟢 Clearing pendingStatusUpdate - selectedTask now has correct status');
+        pendingStatusUpdate.current = null;
+      }
+      
+      // Update from parent if status is different
+      if (selectedTask.status !== editingTaskStatus) {
+        setEditingTaskStatus(selectedTask.status);
+      }
     }
-  }, [selectedTask?.status, editingTaskStatus]);
+  }, [selectedTask?._lastUpdated, selectedTask?.status]);
 
   // Listen for taskUpdated events to refresh the task details
   useEffect(() => {
@@ -314,6 +350,9 @@ export default function TaskDetailsPanel({
           // Use the specific status update API instead of the general task update
           console.log('Status update:', { field, value, taskId: editingTask._id, brandId: currentBrand.id });
           try {
+            // Mark that we're doing a local status update
+            isLocalStatusUpdate.current = true;
+            
             const response = await apiService.updateBrandTaskStatus(currentBrand.id, editingTask._id, value as any);
             console.log('Status update API response:', response);
             
@@ -324,9 +363,17 @@ export default function TaskDetailsPanel({
             // Update the selectedTask in parent component immediately
             onTaskChange(field, value);
             
+            // Reset the flag after delay, but keep pending status until selectedTask updates
+            setTimeout(() => {
+              isLocalStatusUpdate.current = false;
+              // Don't clear pendingStatusUpdate yet - let it stay until selectedTask.status matches
+            }, 500);
+            
             console.log('Status updated successfully via updateBrandTaskStatus');
           } catch (error) {
             console.error('Status update failed:', error);
+            isLocalStatusUpdate.current = false; // Reset flag on error
+            pendingStatusUpdate.current = null; // Clear pending value on error
             throw error;
           }
           break;
@@ -342,9 +389,25 @@ export default function TaskDetailsPanel({
           updateData = { startDate: value };
           break;
         case 'dependencies':
-          updateData = { dependencies: value };
-          setSelectedDependencies(value);
-          break;
+          // Use the dedicated dependencies endpoint
+          console.log('Dependencies update:', { taskId: editingTask._id, brandId: currentBrand.id, dependencies: value });
+          try {
+            const response = await apiService.updateTaskDependencies(currentBrand.id, editingTask._id, value);
+            console.log('Dependencies update API response:', response);
+            
+            // Update local state
+            setSelectedDependencies(value);
+            setEditingTask((prev: any) => ({ ...prev, dependencies: value }));
+            
+            // Update parent
+            onTaskChange(field, value);
+            
+            console.log('Dependencies updated successfully via updateTaskDependencies');
+          } catch (error) {
+            console.error('Dependencies update failed:', error);
+            throw error;
+          }
+          return; // Return early to skip the generic update logic
         default:
           updateData = { [field]: value };
       }
@@ -625,6 +688,20 @@ export default function TaskDetailsPanel({
     }
   };
 
+  // Load project information
+  const loadProjectInfo = async (projId: string) => {
+    if (!projId) return;
+    
+    try {
+      const response = await apiService.getProjectById(projId);
+      // Extract the project from the response (response has structure { project: {...} })
+      const project = response?.project || response;
+      setProjectInfo(project);
+    } catch (error) {
+      console.error('Error loading project info:', error);
+    }
+  };
+
   // Load available dependencies (other tasks in the project)
   const loadAvailableDependencies = async () => {
     if (!currentBrand?.id || !projectId) return;
@@ -708,6 +785,8 @@ export default function TaskDetailsPanel({
     if (field === 'priority') {
       setTaskPriority(value);
     } else if (field === 'status') {
+      isLocalStatusUpdate.current = true; // Set flag BEFORE state update to prevent reset
+      pendingStatusUpdate.current = value; // Set immediately for instant UI update
       setEditingTaskStatus(value);
     }
     setActiveField(null);
@@ -716,6 +795,17 @@ export default function TaskDetailsPanel({
   if (!showTaskDetails || !selectedTask) {
     return null;
   }
+
+  // Use pending status if available, otherwise use editingTaskStatus
+  const displayStatus = pendingStatusUpdate.current || editingTaskStatus;
+  
+  console.log('🔴 RENDER:', {
+    'pendingStatusUpdate.current': pendingStatusUpdate.current,
+    'editingTaskStatus': editingTaskStatus,
+    'displayStatus': displayStatus,
+    'selectedTask.status': selectedTask?.status,
+    'isLocalStatusUpdate.current': isLocalStatusUpdate.current
+  });
 
   return (
     <div className="w-1/3 bg-white border-l border-gray-200 flex flex-col">
@@ -763,8 +853,10 @@ export default function TaskDetailsPanel({
           <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-              <span className="text-sm text-gray-900">Project Name</span>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">To do</span>
+              <span className="text-sm text-gray-900">{projectInfo?.title || projectInfo?.name || 'Loading...'}</span>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                {projectInfo?.status || 'Active'}
+              </span>
             </div>
           </div>
         </div>
@@ -1187,10 +1279,10 @@ export default function TaskDetailsPanel({
               <div className="relative">
                 <button
                   onClick={() => setActiveField(activeField === 'status' ? null : 'status')}
-                  className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(editingTaskStatus)} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-1`}
+                  className={`px-3 py-1 rounded text-sm font-medium ${getStatusColor(displayStatus)} hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-1`}
                   disabled={isUpdatingTask}
                 >
-                  <span>{getStatusIcon(editingTaskStatus)} {editingTaskStatus}</span>
+                  <span>{getStatusIcon(displayStatus)} {displayStatus}</span>
                   <i className="ri-arrow-down-s-line text-xs"></i>
                 </button>
                 
