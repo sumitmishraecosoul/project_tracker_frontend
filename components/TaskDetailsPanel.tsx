@@ -389,9 +389,10 @@ export default function TaskDetailsPanel({
           updateData = { startDate: value };
           break;
         case 'dependencies':
-          // Use the dedicated dependencies endpoint
+          // Try dedicated endpoint first, fallback to generic if it fails
           console.log('Dependencies update:', { taskId: editingTask._id, brandId: currentBrand.id, dependencies: value });
           try {
+            // First try the dedicated dependencies endpoint
             const response = await apiService.updateTaskDependencies(currentBrand.id, editingTask._id, value);
             console.log('Dependencies update API response:', response);
             
@@ -404,8 +405,24 @@ export default function TaskDetailsPanel({
             
             console.log('Dependencies updated successfully via updateTaskDependencies');
           } catch (error) {
-            console.error('Dependencies update failed:', error);
-            throw error;
+            console.log('Dedicated dependencies endpoint failed, trying generic task update:', error);
+            try {
+              // Fallback to generic task update
+              const response = await apiService.updateBrandTask(currentBrand.id, editingTask._id, { dependencies: value });
+              console.log('Generic task update with dependencies response:', response);
+              
+              // Update local state
+              setSelectedDependencies(value);
+              setEditingTask((prev: any) => ({ ...prev, dependencies: value }));
+              
+              // Update parent
+              onTaskChange(field, value);
+              
+              console.log('Dependencies updated successfully via generic task update');
+            } catch (fallbackError) {
+              console.error('Both dependencies endpoints failed:', fallbackError);
+              throw fallbackError;
+            }
           }
           return; // Return early to skip the generic update logic
         default:
