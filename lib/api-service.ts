@@ -71,11 +71,15 @@ interface Task {
 
 class ApiService {
   private getAuthHeader() {
-    console.log('getAuthHeader');
     const stored = localStorage.getItem('token') || '';
     const authValue = stored
       ? stored.startsWith('Bearer ') ? stored : `Bearer ${stored}`
       : '';
+    
+    if (!authValue) {
+      console.warn('⚠️ No token found in localStorage');
+    }
+    
     return {
       'Content-Type': 'application/json',
       ...(authValue && { 'Authorization': authValue })
@@ -119,13 +123,23 @@ class ApiService {
       }
       
       // If token invalid/expired, clear storage to force re-login
+      // Only clear on specific token errors, not all 401s
       if (
-        response.status === 401 ||
-        /token/i.test(errorMessage || '')
+        response.status === 401 &&
+        (errorMessage.includes('NO_TOKEN') || 
+         errorMessage.includes('token expired') ||
+         errorMessage.includes('invalid token') ||
+         errorMessage.includes('jwt malformed'))
       ) {
+        console.error('🔴 Token error detected, clearing auth data:', errorMessage);
         try {
           localStorage.removeItem('token');
           localStorage.removeItem('currentUser');
+          localStorage.removeItem('currentBrand');
+          // Redirect to login page
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+          }
         } catch {}
       }
       throw new Error(errorMessage);
