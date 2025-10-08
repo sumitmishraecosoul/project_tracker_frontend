@@ -39,6 +39,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       
+      // Check if token exists before trying to load brands
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('BrandContext: No token found during initialization, skipping brand load');
+        setIsLoading(false);
+        return;
+      }
+      
       // Add timeout to prevent infinite loading
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Brand loading timeout')), 10000); // 10 second timeout
