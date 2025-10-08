@@ -89,6 +89,7 @@ export default function TaskDetailsPanel({
   // Track if we're updating status locally to prevent overwriting from parent
   const isLocalStatusUpdate = useRef(false);
   const pendingStatusUpdate = useRef<string | null>(null);
+  const isEditingDescription = useRef(false);
   
   // Project information
   const [projectInfo, setProjectInfo] = useState<any>(null);
@@ -119,7 +120,10 @@ export default function TaskDetailsPanel({
       
       setEditingTask(selectedTask);
       setEditingTaskName(selectedTask.task || '');
-      setEditingTaskDescription(selectedTask.description || '');
+      // Only update description if not currently editing
+      if (!isEditingDescription.current) {
+        setEditingTaskDescription(selectedTask.description || '');
+      }
       setEditingTaskPriority(selectedTask.priority || '');
       
       // Only update status if not doing a local update AND if it's actually different
@@ -378,6 +382,8 @@ export default function TaskDetailsPanel({
         case 'description':
           updateData = { description: value };
           setEditingTaskDescription(value);
+          // Immediately update the editing task to show the change
+          setEditingTask((prev: any) => ({ ...prev, description: value }));
           break;
         case 'priority':
           updateData = { priority: value };
@@ -510,18 +516,27 @@ export default function TaskDetailsPanel({
           // Call parent update to refresh the main task list
           onTaskChange(field, value);
           
-          // Wait a bit before calling onUpdateTask to ensure the backend has processed
-          setTimeout(async () => {
-            console.log('TaskDetailsPanel: Calling onUpdateTask after delay');
-            await onUpdateTask();
-            
-            // Trigger a window event to force refresh
+          // For description updates, don't reload the entire task to prevent overwriting
+          if (field !== 'description') {
+            // Wait a bit before calling onUpdateTask to ensure the backend has processed
+            setTimeout(async () => {
+              console.log('TaskDetailsPanel: Calling onUpdateTask after delay');
+              await onUpdateTask();
+              
+              // Trigger a window event to force refresh
+              window.dispatchEvent(new CustomEvent('taskUpdated', { 
+                detail: { taskId: editingTask._id, field, value, updatedTask } 
+              }));
+              
+              console.log('TaskDetailsPanel: All updates completed');
+            }, 200);
+          } else {
+            console.log('TaskDetailsPanel: Description update - skipping full reload to preserve local state');
+            // Just trigger the event without reloading
             window.dispatchEvent(new CustomEvent('taskUpdated', { 
               detail: { taskId: editingTask._id, field, value, updatedTask } 
             }));
-            
-            console.log('TaskDetailsPanel: All updates completed');
-          }, 200);
+          }
           
           console.log('Task updated successfully:', field, value);
         } else {
@@ -1427,16 +1442,27 @@ export default function TaskDetailsPanel({
           <div className="border border-gray-300 rounded-md">
             <textarea
               value={editingTaskDescription}
+              onFocus={() => {
+                isEditingDescription.current = true;
+              }}
               onChange={(e) => setEditingTaskDescription(e.target.value)}
               onBlur={() => {
                 if (editingTaskDescription !== selectedTask?.description && editingTaskDescription.trim()) {
                   console.log('Saving description:', editingTaskDescription.trim());
                   handleUpdateTask('description', editingTaskDescription.trim());
                 }
+                // Clear the editing flag after a longer delay to prevent reload from overwriting
+                setTimeout(() => {
+                  isEditingDescription.current = false;
+                }, 1000);
               }}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && e.ctrlKey && editingTaskDescription.trim()) {
                   handleUpdateTask('description', editingTaskDescription.trim());
+                  // Clear the editing flag after a delay
+                  setTimeout(() => {
+                    isEditingDescription.current = false;
+                  }, 500);
                 }
               }}
               className="w-full px-3 py-2 focus:outline-none resize-none h-24"
@@ -1483,7 +1509,23 @@ export default function TaskDetailsPanel({
               <button className="p-1 text-gray-400 hover:text-gray-600" title="More formatting">
                 <i className="ri-magic-line text-sm"></i>
               </button>
-              <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+              <button 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (editingTaskDescription.trim() && editingTaskDescription !== selectedTask?.description) {
+                    console.log('Add description button clicked, saving:', editingTaskDescription.trim());
+                    isEditingDescription.current = true;
+                    handleUpdateTask('description', editingTaskDescription.trim());
+                    // Keep the flag set for longer to prevent reload from overwriting
+                    setTimeout(() => {
+                      isEditingDescription.current = false;
+                    }, 1000);
+                  }
+                }}
+                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
                 Add description
               </button>
             </div>
