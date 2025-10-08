@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiService } from '../lib/api-service';
 import DynamicCommentsSection from './DynamicCommentsSection';
 import TaskLinksSection from './TaskLinksSection';
+import { useProjects } from './ProjectContext';
 
 interface TaskDetailsPanelProps {
   showTaskDetails: boolean;
@@ -26,6 +27,8 @@ export default function TaskDetailsPanel({
   currentBrand,
   projectId
 }: TaskDetailsPanelProps) {
+  const { currentProject } = useProjects();
+  
   // Task editing states
   const [editingTask, setEditingTask] = useState<any>(null);
   const [editingTaskName, setEditingTaskName] = useState('');
@@ -89,6 +92,22 @@ export default function TaskDetailsPanel({
   
   // Project information
   const [projectInfo, setProjectInfo] = useState<any>(null);
+  const [projectInfoLoading, setProjectInfoLoading] = useState(false);
+  
+  // Update projectInfo when currentProject changes
+  useEffect(() => {
+    console.log('🟣 currentProject useEffect triggered:', { 
+      currentProject: !!currentProject, 
+      projectInfo: !!projectInfo,
+      currentProjectTitle: currentProject?.title,
+      currentProjectStatus: currentProject?.status
+    });
+    
+    if (currentProject && !projectInfo) {
+      console.log('🟣 Setting projectInfo from currentProject:', currentProject);
+      setProjectInfo(currentProject);
+    }
+  }, [currentProject, projectInfo]);
 
   // Initialize editing states when selectedTask changes
   useEffect(() => {
@@ -173,8 +192,26 @@ export default function TaskDetailsPanel({
       
       // Load project information
       const taskProjectId = selectedTask.projectId || projectId;
+      console.log('🟣 Project ID resolution:', {
+        selectedTaskProjectId: selectedTask.projectId,
+        propProjectId: projectId,
+        resolvedProjectId: taskProjectId,
+        currentBrandId: currentBrand?.id,
+        currentProject: !!currentProject
+      });
+      
       if (taskProjectId) {
+        console.log('🟣 Loading project info for task:', taskProjectId);
         loadProjectInfo(taskProjectId);
+      } else {
+        console.log('🟣 No project ID available for task');
+        // Use currentProject as fallback
+        if (currentProject) {
+          console.log('🟣 Using currentProject as fallback:', currentProject);
+          setProjectInfo(currentProject);
+        } else {
+          console.log('🟣 No currentProject available either');
+        }
       }
       
       // Set assignee search
@@ -707,15 +744,45 @@ export default function TaskDetailsPanel({
 
   // Load project information
   const loadProjectInfo = async (projId: string) => {
-    if (!projId) return;
+    if (!projId || !currentBrand?.id) {
+      console.log('🟣 Missing projectId or brandId:', { projId, brandId: currentBrand?.id });
+      return;
+    }
     
     try {
-      const response = await apiService.getProjectById(projId);
-      // Extract the project from the response (response has structure { project: {...} })
-      const project = response?.project || response;
-      setProjectInfo(project);
+      setProjectInfoLoading(true);
+      console.log('🟣 Loading project info for ID:', projId, 'Brand ID:', currentBrand.id);
+      const response = await apiService.getProjectDetails(currentBrand.id, projId);
+      console.log('🟣 Project info response:', response);
+      console.log('🟣 Response success:', response?.success);
+      console.log('🟣 Response data:', response?.data);
+      console.log('🟣 Response message:', response?.message);
+      
+      // Extract the project from the response
+      const project = response?.data?.project || response?.data || response;
+      console.log('🟣 Extracted project:', project);
+      console.log('🟣 Project title:', project?.title);
+      console.log('🟣 Project status:', project?.status);
+      
+      if (project && (project.title || project.name)) {
+        setProjectInfo(project);
+        console.log('🟣 Project info set successfully');
+      } else {
+        console.log('🟣 Invalid project data, using currentProject fallback');
+        if (currentProject) {
+          setProjectInfo(currentProject);
+        }
+      }
     } catch (error) {
-      console.error('Error loading project info:', error);
+      console.error('🟣 Error loading project info:', error);
+      console.log('🟣 Using currentProject as fallback due to error');
+      if (currentProject) {
+        setProjectInfo(currentProject);
+      } else {
+        setProjectInfo(null);
+      }
+    } finally {
+      setProjectInfoLoading(false);
     }
   };
 
@@ -870,9 +937,30 @@ export default function TaskDetailsPanel({
           <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-              <span className="text-sm text-gray-900">{projectInfo?.title || projectInfo?.name || 'Loading...'}</span>
+              <span className="text-sm text-gray-900">
+                {(() => {
+                  const title = projectInfoLoading ? 'Loading...' : (projectInfo?.title || projectInfo?.name || currentProject?.title || 'Project not found');
+                  console.log('🟣 Display title resolution:', {
+                    projectInfoLoading,
+                    projectInfoTitle: projectInfo?.title,
+                    projectInfoName: projectInfo?.name,
+                    currentProjectTitle: currentProject?.title,
+                    finalTitle: title
+                  });
+                  return title;
+                })()}
+              </span>
               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                {projectInfo?.status || 'Active'}
+                {(() => {
+                  const status = projectInfoLoading ? 'Loading...' : (projectInfo?.status || currentProject?.status || 'Unknown');
+                  console.log('🟣 Display status resolution:', {
+                    projectInfoLoading,
+                    projectInfoStatus: projectInfo?.status,
+                    currentProjectStatus: currentProject?.status,
+                    finalStatus: status
+                  });
+                  return status;
+                })()}
               </span>
             </div>
           </div>
