@@ -187,9 +187,25 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
   const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
     try {
-      await updateTaskStatus(currentBrand?.id || 'test-brand-id', taskId, newStatus as any);
+      console.log('ModernProjectDetail - handleTaskStatusChange called:', { taskId, newStatus, brandId: currentBrand?.id });
+      
+      if (!currentBrand?.id) {
+        console.error('ModernProjectDetail - No brand ID available for status update');
+        return;
+      }
+      
+      await updateTaskStatus(currentBrand.id, taskId, newStatus as any);
+      console.log('ModernProjectDetail - Task status updated successfully');
+      
+      // Refresh the task list to show the updated status
+      if (projectId) {
+        await getProjectTasks(currentBrand.id, projectId);
+        console.log('ModernProjectDetail - Task list refreshed after status update');
+      }
     } catch (error) {
-      console.error('Error updating task status:', error);
+      console.error('ModernProjectDetail - Error updating task status:', error);
+      // Show error to user
+      alert('Failed to update task status. Please try again.');
     }
   };
 
