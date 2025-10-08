@@ -59,20 +59,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = () => {
       try {
+        console.log('🔐 AuthContext: Initializing authentication...');
         const storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('currentUser');
         
+        console.log('🔐 AuthContext: Token exists:', !!storedToken);
+        console.log('🔐 AuthContext: User exists:', !!storedUser);
+        
         if (storedToken && storedUser) {
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          console.log('🔐 AuthContext: User loaded:', userData.email);
+        } else {
+          console.warn('🔐 AuthContext: No stored auth data found');
         }
       } catch (error) {
-        console.error('Error initializing auth state:', error);
+        console.error('🔐 AuthContext: Error initializing auth state:', error);
         // Clear invalid data
         localStorage.removeItem('token');
         localStorage.removeItem('currentUser');
       } finally {
         setIsLoading(false);
+        console.log('🔐 AuthContext: Initialization complete');
       }
     };
 
