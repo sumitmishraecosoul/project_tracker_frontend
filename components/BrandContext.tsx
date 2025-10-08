@@ -75,6 +75,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
   const getBrands = async () => {
     try {
+      // Check if token exists
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('BrandContext - No token found, skipping brand fetch');
+        setError('Authentication required');
+        return;
+      }
+      
       const response = await apiService.getBrands();
       if (response.success) {
         setBrands(response.data || []);
@@ -86,7 +94,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: any) {
       console.error('BrandContext - Error fetching brands:', error);
-      setError(error.message || 'Failed to load brands');
+      // Check if it's a token error
+      if (error.message && (error.message.includes('NO_TOKEN') || error.message.includes('token'))) {
+        console.error('BrandContext - Token error detected, user needs to re-login');
+        setError('Session expired. Please log in again.');
+      } else {
+        setError(error.message || 'Failed to load brands');
+      }
       // Don't throw error here - let the context continue with empty brands
       // This prevents the component from getting stuck in loading state
     }
@@ -140,13 +154,28 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const switchToBrand = async (brandId: string) => {
     try {
       setError(null);
+      console.log('BrandContext - Switching to brand:', brandId);
+      
+      // Ensure token exists before making the call
+      const currentToken = localStorage.getItem('token');
+      if (!currentToken) {
+        console.error('BrandContext - No token found, cannot switch brand');
+        setError('Authentication required. Please log in again.');
+        throw new Error('No authentication token found');
+      }
+      
       const response = await apiService.switchToBrand(brandId);
+      console.log('BrandContext - Switch brand response:', response);
+      
       if (response.success) {
         const switchData: SwitchBrandResponse = response.data;
         
-        // Update token in localStorage
+        // Update token in localStorage ONLY if a new token is provided
         if (response.token) {
+          console.log('BrandContext - Updating token from switch response');
           localStorage.setItem('token', response.token);
+        } else {
+          console.log('BrandContext - No new token in response, keeping existing token');
         }
         
         // Update current brand
@@ -165,6 +194,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setCurrentBrand(brandData);
         setSelectedBrand(brandData);
         localStorage.setItem('currentBrand', JSON.stringify(brandData));
+        console.log('BrandContext - Brand switched successfully');
         
         return response;
       } else {
@@ -172,7 +202,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         throw new Error(response.message || 'Failed to switch brand');
       }
     } catch (error: any) {
-      console.error('Error switching brand:', error);
+      console.error('BrandContext - Error switching brand:', error);
       setError(error.message || 'Failed to switch brand');
       throw error;
     }
