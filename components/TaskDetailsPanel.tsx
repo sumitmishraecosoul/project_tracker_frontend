@@ -118,7 +118,15 @@ export default function TaskDetailsPanel({
       console.log('🔵 selectedTask.status:', selectedTask.status);
       console.log('🔵 Current editingTaskStatus:', editingTaskStatus);
       
-      setEditingTask(selectedTask);
+      // Update editingTask, but preserve status if we're doing a local update
+      if (!isLocalStatusUpdate.current && !pendingStatusUpdate.current) {
+        setEditingTask(selectedTask);
+      } else {
+        // Keep the current status, but update other fields
+        setEditingTask((prev: any) => ({ ...selectedTask, status: prev.status }));
+        console.log('🔵 Preserving local status during task update');
+      }
+      
       setEditingTaskName(selectedTask.task || '');
       // Only update description if not currently editing
       if (!isEditingDescription.current) {
@@ -406,11 +414,11 @@ export default function TaskDetailsPanel({
             // Update the selectedTask in parent component immediately
             onTaskChange(field, value);
             
-            // Reset the flag after delay, but keep pending status until selectedTask updates
+            // Keep the flag set longer to prevent reload from overwriting
             setTimeout(() => {
               isLocalStatusUpdate.current = false;
               // Don't clear pendingStatusUpdate yet - let it stay until selectedTask.status matches
-            }, 500);
+            }, 2000); // Extended to 2 seconds to prevent overwrites
             
             console.log('Status updated successfully via updateBrandTaskStatus');
           } catch (error) {
@@ -474,21 +482,16 @@ export default function TaskDetailsPanel({
       
       // Handle status updates separately
       if (field === 'status') {
-        // Status update is handled above, just trigger the refresh
-        console.log('Status update completed, triggering refresh');
+        // Status update is handled above, skip reload to preserve local state
+        console.log('Status update completed, skipping reload to preserve local state');
         onTaskChange(field, value);
         
-        setTimeout(async () => {
-          console.log('TaskDetailsPanel: Calling onUpdateTask after status update');
-          await onUpdateTask();
-          
-          // Trigger a window event to force refresh
-          window.dispatchEvent(new CustomEvent('taskUpdated', { 
-            detail: { taskId: editingTask._id, field, value } 
-          }));
-          
-          console.log('TaskDetailsPanel: Status update completed');
-        }, 200);
+        // Just trigger the event without reloading
+        window.dispatchEvent(new CustomEvent('taskUpdated', { 
+          detail: { taskId: editingTask._id, field, value } 
+        }));
+        
+        console.log('TaskDetailsPanel: Status update completed');
       } else {
         // Handle other field updates normally
         console.log('Updating task with data:', { 
