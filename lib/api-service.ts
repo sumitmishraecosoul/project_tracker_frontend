@@ -101,7 +101,19 @@ class ApiService {
         if (typeof errorData === 'string') {
           errorMessage = errorData;
         } else if (typeof errorData === 'object' && errorData !== null) {
+          // Try to extract the most meaningful error message
           errorMessage = errorData.message || errorData.error || errorData.msg || errorData.details || JSON.stringify(errorData);
+          
+          // For 409 Conflict, provide a more user-friendly message
+          if (response.status === 409) {
+            if (errorMessage.toLowerCase().includes('email')) {
+              errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+            } else if (errorMessage.toLowerCase().includes('employee')) {
+              errorMessage = 'This employee number is already registered. Please use a different employee number.';
+            } else {
+              errorMessage = 'This account already exists. Please try logging in or use different credentials.';
+            }
+          }
         } else {
           errorMessage = String(errorData) || 'API request failed';
         }

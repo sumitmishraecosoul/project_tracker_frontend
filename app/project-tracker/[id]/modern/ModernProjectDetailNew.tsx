@@ -151,6 +151,31 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     }
   };
 
+  const handleAddSubtask = async (taskId: string, subtaskData?: any) => {
+    console.log('handleAddSubtask called:', { taskId, subtaskData });
+    
+    if (subtaskData) {
+      // Handle inline subtask creation
+      try {
+        console.log('handleAddSubtask: Creating subtask with data:', subtaskData);
+        setIsCreatingTask(true);
+        await createSubtask({
+          ...subtaskData,
+          parentTaskId: taskId
+        });
+        console.log('handleAddSubtask: Subtask created successfully for task:', taskId);
+      } catch (error) {
+        console.error('handleAddSubtask: Error creating subtask:', error);
+      } finally {
+        setIsCreatingTask(false);
+      }
+    } else {
+      // Handle opening the add subtask modal or inline form
+      console.log('Add subtask clicked for task:', taskId);
+      // The inline form is now handled in CategoryTaskSections component
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!newTaskName.trim() || isCreatingTask || !selectedCategoryForTask || !currentBrand) return;
 
@@ -316,6 +341,54 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       [field]: value,
       _lastUpdated: Date.now() // Force a new object reference
     }));
+  };
+
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+      console.log('handleTaskDelete called:', { taskId, brandId: currentBrand?.id });
+      
+      if (!currentBrand?.id) {
+        console.error('No brand ID available for task deletion');
+        alert('No brand selected. Cannot delete task.');
+        return;
+      }
+
+      // Call the API to delete the task
+      const response = await apiService.deleteBrandTask(currentBrand.id, taskId);
+      
+      if (response.success) {
+        console.log('Task deleted successfully');
+        
+        // Close the task details panel if the deleted task was selected
+        if (selectedTask?._id === taskId) {
+          setShowTaskDetails(false);
+          setSelectedTask(null);
+        }
+        
+        // Refresh the task list
+        if (projectId) {
+          await getProjectTasks(currentBrand.id, projectId);
+          console.log('Task list refreshed after deletion');
+        }
+        
+        // Show success message
+        alert('Task deleted successfully!');
+      } else {
+        console.error('Failed to delete task:', response.message);
+        alert(`Failed to delete task: ${response.message}`);
+      }
+    } catch (error: any) {
+      console.error('Error deleting task:', error);
+      
+      // Show user-friendly error message
+      if (error.message && error.message.includes('INSUFFICIENT_ROLE')) {
+        alert('You don\'t have permission to delete tasks. Please contact your administrator.');
+      } else if (error.message && error.message.includes('NOT_FOUND')) {
+        alert('Task not found. It may have already been deleted.');
+      } else {
+        alert('Failed to delete task. Please try again or contact support.');
+      }
+    }
   };
 
 
@@ -554,8 +627,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     onTaskSelect={handleTaskSelect}
                     selectedTask={selectedTask}
                     onAddTask={handleAddTask}
+                    onAddSubtask={handleAddSubtask}
                     onTaskStatusChange={handleTaskStatusChange}
                     onTaskCheckboxClick={handleTaskCheckboxClick}
+                    onTaskDelete={handleTaskDelete}
                     expandedTasks={expandedTasks}
                     toggleTaskExpansion={toggleTaskExpansion}
                       taskSubtasks={subtasks as any}
@@ -579,6 +654,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   onClose={() => setShowTaskDetails(false)}
                   onUpdateTask={handleUpdateTask}
                   onTaskChange={handleTaskChange}
+                  onTaskDelete={handleTaskDelete}
                   currentBrand={currentBrand}
                   projectId={projectId}
                 />

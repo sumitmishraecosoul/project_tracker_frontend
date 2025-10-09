@@ -74,7 +74,17 @@ export default function SignupPage() {
       // Redirect to login page after successful signup
       router.push('/login');
     } catch (err: any) {
-      setError(err.message || 'Signup failed. Please try again.');
+      console.error('Signup error details:', err);
+      
+      // Handle specific error messages
+      let errorMessage = err.message || 'Signup failed. Please try again.';
+      
+      // Check if it's a 409 Conflict (user already exists)
+      if (errorMessage.includes('409') || errorMessage.includes('Conflict') || errorMessage.includes('already exists')) {
+        errorMessage = 'This email or employee number is already registered. Please use a different email/employee number or try logging in.';
+      }
+      
+      setError(errorMessage);
     }
 
     setIsLoading(false);
