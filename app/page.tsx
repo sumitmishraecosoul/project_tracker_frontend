@@ -20,22 +20,22 @@ export default function ApplicationLauncher() {
   }, [router]);
 
   const handleProjectTracker = () => {
-    console.log('Project Tracker clicked - navigating to dashboard...');
+    console.log('Project Tracker clicked - navigating to project tracker...');
     
     // Test if the function is being called
     console.log('Function executed successfully');
     
-    // Use the correct dashboard URL
-    const dashboardUrl = '/project-tracker/dashboard';
-    console.log('Navigating to:', dashboardUrl);
+    // Use the correct project tracker URL
+    const projectTrackerUrl = '/project-tracker';
+    console.log('Navigating to:', projectTrackerUrl);
     
     try {
       // Use window.location.href for reliable navigation
-      window.location.href = dashboardUrl;
+      window.location.href = projectTrackerUrl;
     } catch (error) {
       console.error('Navigation failed:', error);
       // Fallback to router.push
-      router.push(dashboardUrl);
+      router.push(projectTrackerUrl);
     }
   };
 

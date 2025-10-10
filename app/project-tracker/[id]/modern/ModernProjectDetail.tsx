@@ -1270,7 +1270,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
 
 
         {/* Project Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        {/* <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
@@ -1314,7 +1314,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
               </button>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* View Navigation Tabs */}
         <div className="bg-white border-b border-gray-200 px-6">

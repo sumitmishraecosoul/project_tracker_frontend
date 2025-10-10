@@ -531,10 +531,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
             <button className="p-2 text-gray-600 hover:text-gray-800">
               <i className="ri-menu-line text-lg"></i>
             </button>
-            <button className="px-3 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 flex items-center space-x-1">
+            {/* <button className="px-3 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 flex items-center space-x-1">
               <i className="ri-add-line text-sm"></i>
               <span>Create</span>
-            </button>
+            </button> */}
           </div>
           <div className="flex items-center space-x-4">
             <div className="relative">
@@ -566,7 +566,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
           {/* Task Management Area */}
           <div className="flex-1 flex flex-col">
             {/* Project Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4">
+            {/* <div className="bg-white border-b border-gray-200 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
@@ -604,10 +604,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   {project ? (project as any).name || (project as any).title : `Project ${projectId}`}
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* View Tabs */}
-            <div className="bg-white border-b border-gray-200 px-6">
+            {/* <div className="bg-white border-b border-gray-200 px-6">
               <div className="flex space-x-6">
                 <button className="py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
                   List
@@ -641,10 +641,10 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   <i className="ri-add-line text-xs"></i>
                 </button>
               </div>
-            </div>
+            </div> */}
 
             {/* Task Actions */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3">
+            {/* <div className="bg-white border-b border-gray-200 px-6 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <button className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded flex items-center space-x-2">
@@ -676,7 +676,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   </button>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* Task Header */}
             <div className="bg-white border-b border-gray-200 px-6 py-3">
