@@ -321,12 +321,13 @@ export default function CategoryTaskSections({
       console.error('Error creating subtask:', error);
       
       // Show user-friendly error message
-      if (error.message && error.message.includes('INSUFFICIENT_ROLE')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('INSUFFICIENT_ROLE')) {
         alert('You don\'t have permission to create subtasks. Please contact your administrator to grant subtask creation permissions.');
-      } else if (error.message && error.message.includes('Invalid assignedTo')) {
+      } else if (errorMessage.includes('Invalid assignedTo')) {
         alert('Invalid user selected for assignment. Please select a valid user from the dropdown or leave it unassigned.');
-      } else if (error.message && error.message.includes('VALIDATION_ERROR')) {
-        const errorMsg = error.message.match(/"message":"([^"]+)"/)?.[1] || 'Validation error';
+      } else if (errorMessage.includes('VALIDATION_ERROR')) {
+        const errorMsg = errorMessage.match(/"message":"([^"]+)"/)?.[1] || 'Validation error';
         alert(`Validation Error: ${errorMsg}`);
       } else {
         alert('Failed to create subtask. Please try again or contact support.');
