@@ -4,14 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { useCategories } from './CategoryContext';
 import { useTasks } from './TaskContext';
 import { useBrand } from './BrandContext';
+import { useAuth } from '../lib/contexts/AuthContext';
 import { apiService } from '../lib/api-service';
+import { canDeleteTask } from '../lib/permissions';
 
 interface CategoryTaskSectionsProps {
   onTaskSelect: (task: any) => void;
   selectedTask: any;
   onAddTask: (categoryId: string, taskData?: any) => void;
+  onAddSubtask: (taskId: string, subtaskData?: any) => void;
   onTaskStatusChange: (taskId: string, status: string) => void;
   onTaskCheckboxClick: (task: any) => void;
+  onTaskDelete: (taskId: string) => void;
   expandedTasks: { [key: string]: boolean };
   toggleTaskExpansion: (taskId: string) => void;
   taskSubtasks: { [key: string]: any[] };
@@ -23,8 +27,10 @@ export default function CategoryTaskSections({
   onTaskSelect,
   selectedTask,
   onAddTask,
+  onAddSubtask,
   onTaskStatusChange,
   onTaskCheckboxClick,
+  onTaskDelete,
   expandedTasks,
   toggleTaskExpansion,
   taskSubtasks,
@@ -34,6 +40,7 @@ export default function CategoryTaskSections({
   const { categories, loading: categoriesLoading } = useCategories();
   const { tasks, loading: tasksLoading } = useTasks();
   const { currentBrand } = useBrand();
+  const { user } = useAuth();
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
   const [refreshKey, setRefreshKey] = useState(0);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -45,6 +52,16 @@ export default function CategoryTaskSections({
   const [newTaskStatus, setNewTaskStatus] = useState('Yet to Start');
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [brandUsers, setBrandUsers] = useState<any[]>([]);
+  
+  // Subtask creation state
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [newSubtaskName, setNewSubtaskName] = useState('');
+  const [newSubtaskAssignee, setNewSubtaskAssignee] = useState('');
+  const [newSubtaskStartDate, setNewSubtaskStartDate] = useState('');
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState('');
+  const [newSubtaskPriority, setNewSubtaskPriority] = useState('Low');
+  const [newSubtaskStatus, setNewSubtaskStatus] = useState('Yet to Start');
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
 
   // Force refresh when tasks change
   useEffect(() => {
@@ -230,6 +247,117 @@ export default function CategoryTaskSections({
     }
   };
 
+  // Subtask creation functions
+  const handleStartAddingSubtask = (taskId: string) => {
+    setEditingTaskId(taskId);
+    setNewSubtaskName('');
+    setNewSubtaskAssignee('');
+    setNewSubtaskStartDate('');
+    setNewSubtaskDueDate('');
+    setNewSubtaskPriority('Low');
+    setNewSubtaskStatus('Yet to Start');
+    loadBrandUsers();
+    
+    // Debug: Log brandUsers structure
+    console.log('🟡 handleStartAddingSubtask - brandUsers:', brandUsers);
+    console.log('🟡 handleStartAddingSubtask - brandUsers count:', brandUsers.length);
+    if (brandUsers.length > 0) {
+      console.log('🟡 handleStartAddingSubtask - First user structure:', brandUsers[0]);
+      console.log('🟡 handleStartAddingSubtask - First user _id:', brandUsers[0]._id);
+      console.log('🟡 handleStartAddingSubtask - First user name:', brandUsers[0].name);
+    }
+  };
+
+  const handleCancelAddingSubtask = () => {
+    setEditingTaskId(null);
+    setNewSubtaskName('');
+    setNewSubtaskAssignee('');
+    setNewSubtaskStartDate('');
+    setNewSubtaskDueDate('');
+    setNewSubtaskPriority('Low');
+    setNewSubtaskStatus('Yet to Start');
+  };
+
+  const handleCreateSubtask = async () => {
+    console.log('handleCreateSubtask called:', {
+      newSubtaskName: newSubtaskName.trim(),
+      editingTaskId,
+      currentBrand: !!currentBrand
+    });
+    
+    if (!newSubtaskName.trim() || !editingTaskId || !currentBrand) {
+      console.log('handleCreateSubtask: Missing required fields');
+      return;
+    }
+    
+    try {
+      setIsCreatingSubtask(true);
+      console.log('handleCreateSubtask: Starting subtask creation');
+      
+      // Get current user ID for reporter (who created the subtask)
+      const currentUser = localStorage.getItem('currentUser');
+      const userData = currentUser ? JSON.parse(currentUser) : null;
+      const userId = userData?.id || currentBrand?.id || '';
+      
+      const subtaskData = {
+        task: newSubtaskName.trim(),
+        parentTaskId: editingTaskId,
+        // Only include assignedTo if it's a valid non-empty string
+        ...(newSubtaskAssignee && newSubtaskAssignee.trim() !== '' ? { assignedTo: newSubtaskAssignee } : {}),
+        reporter: userId,
+        startDate: newSubtaskStartDate || undefined,
+        eta: newSubtaskDueDate || undefined,
+        priority: newSubtaskPriority,
+        status: newSubtaskStatus
+      };
+      
+      console.log('handleCreateSubtask: Calling onAddSubtask with data:', subtaskData);
+      console.log('handleCreateSubtask: assignedTo value:', newSubtaskAssignee);
+      console.log('handleCreateSubtask: brandUsers available:', brandUsers.length);
+      await onAddSubtask(editingTaskId, subtaskData);
+      console.log('handleCreateSubtask: Subtask created successfully');
+      handleCancelAddingSubtask();
+    } catch (error) {
+      console.error('Error creating subtask:', error);
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('INSUFFICIENT_ROLE')) {
+        alert('You don\'t have permission to create subtasks. Please contact your administrator to grant subtask creation permissions.');
+      } else if (errorMessage.includes('Invalid assignedTo')) {
+        alert('Invalid user selected for assignment. Please select a valid user from the dropdown or leave it unassigned.');
+      } else if (errorMessage.includes('VALIDATION_ERROR')) {
+        const errorMsg = errorMessage.match(/"message":"([^"]+)"/)?.[1] || 'Validation error';
+        alert(`Validation Error: ${errorMsg}`);
+      } else {
+        alert('Failed to create subtask. Please try again or contact support.');
+      }
+    } finally {
+      setIsCreatingSubtask(false);
+    }
+  };
+
+  const handleSubtaskKeyPress = (e: React.KeyboardEvent) => {
+    console.log('handleSubtaskKeyPress called:', {
+      key: e.key,
+      isCreatingSubtask,
+      newSubtaskName: newSubtaskName.trim(),
+      newSubtaskAssignee: newSubtaskAssignee,
+      assigneeLength: newSubtaskAssignee.length,
+      assigneeIsEmpty: newSubtaskAssignee === '',
+      brandUsersCount: brandUsers.length
+    });
+    
+    if (e.key === 'Enter' && !isCreatingSubtask) {
+      console.log('handleSubtaskKeyPress: Enter pressed, calling handleCreateSubtask');
+      console.log('handleSubtaskKeyPress: Current assignee value:', newSubtaskAssignee);
+      handleCreateSubtask();
+    } else if (e.key === 'Escape') {
+      console.log('handleSubtaskKeyPress: Escape pressed, canceling');
+      handleCancelAddingSubtask();
+    }
+  };
+
   console.log('CategoryTaskSections: Rendering with', {
     categoriesLoading,
     tasksLoading,
@@ -399,17 +527,15 @@ export default function CategoryTaskSections({
                           </button>
                         </div>
                         <div className="col-span-2 flex items-center space-x-0.5">
-                          {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleTaskExpansion(task._id);
-                              }}
-                              className="p-1 text-gray-400 hover:text-gray-600"
-                            >
-                              <i className={`ri-arrow-${expandedTasks[task._id] ? 'down' : 'right'}-s-line text-sm`}></i>
-                            </button>
-                          )}
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTaskExpansion(task._id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600"
+                          >
+                            <i className={`ri-arrow-${expandedTasks[task._id] ? 'down' : 'right'}-s-line text-sm`}></i>
+                          </button>
                           <span className="text-sm text-gray-900 truncate">{task.task}</span>
                           {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
                             <span className="text-xs text-gray-500">({taskSubtasks[task._id].length})</span>
@@ -466,6 +592,20 @@ export default function CategoryTaskSections({
                             <option value="Cancelled">Cancelled</option>
                             <option value="Recurring">Recurring</option>
                           </select>
+                          {canDeleteTask(user, currentBrand) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to delete "${task.task}"? This action cannot be undone.`)) {
+                                  onTaskDelete(task._id);
+                                }
+                              }}
+                              className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded ml-2"
+                              title="Delete task"
+                            >
+                              <i className="ri-delete-bin-line text-sm"></i>
+                            </button>
+                          )}
                           <button 
                             className="p-1 text-gray-400 hover:text-gray-600 ml-2"
                             onClick={(e) => {
@@ -480,44 +620,187 @@ export default function CategoryTaskSections({
                     </div>
                     
                     {/* Subtasks */}
-                    {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && expandedTasks[task._id] && (
+                    {expandedTasks[task._id] && (
                       <div className="bg-gray-50">
-                        {taskSubtasks[task._id].map((subtask) => (
-                          <div key={subtask._id} className="px-6 py-3 pl-14 border-b border-gray-100">
+                        {/* Existing subtasks */}
+                        {taskSubtasks[task._id] && taskSubtasks[task._id].length > 0 && (
+                          <>
+                            {taskSubtasks[task._id].map((subtask) => (
+                              <div key={subtask._id} className="px-6 py-3 pl-14 border-b border-gray-100">
+                                <div className="grid grid-cols-12 gap-1 items-center">
+                                  <div className="col-span-1">
+                                    <button 
+                                      onClick={() => {
+                                        // Handle subtask status change
+                                        console.log('Subtask status change:', subtask._id);
+                                      }}
+                                      className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                                    >
+                                      {subtask.status === 'Completed' ? (
+                                        <i className="ri-check-line text-xs text-green-600"></i>
+                                      ) : (
+                                        <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                                      )}
+                                    </button>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <div className="flex items-center space-x-1">
+                                      <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                        <i className="ri-user-line text-xs text-gray-400"></i>
+                                      </div>
+                                      <span className="text-sm text-gray-900 truncate">
+                                        {subtask.assignedTo?.name || 'Unassigned'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-500">
+                                      {subtask.startDate ? new Date(subtask.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-500">
+                                      {subtask.dueDate ? new Date(subtask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-1">
+                                    <span className={`px-0.5 py-0.5 rounded text-xs font-medium ${
+                                      subtask.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                      subtask.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {subtask.priority || 'Low'}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2 flex items-center justify-center">
+                                    <select 
+                                      value={subtask.status || 'Yet to Start'}
+                                      onChange={(e) => {
+                                        // Handle subtask status change
+                                        console.log('Subtask status change:', subtask._id, e.target.value);
+                                      }}
+                                      className="px-1 py-1 rounded text-xs font-medium border-0 bg-transparent bg-gray-100 text-gray-800"
+                                    >
+                                      <option value="Yet to Start">Yet to Start</option>
+                                      <option value="In Progress">In Progress</option>
+                                      <option value="Completed">Completed</option>
+                                      <option value="On Hold">On Hold</option>
+                                      <option value="Under Review">Under Review</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                        
+                        {/* Add subtask option */}
+                        {editingTaskId === task._id ? (
+                          <div className="px-6 py-3 pl-14 bg-blue-50 border-l-4 border-blue-500">
                             <div className="grid grid-cols-12 gap-1 items-center">
                               <div className="col-span-1">
-                                <button 
-                                  onClick={() => {
-                                    // Handle subtask status change
-                                    console.log('Subtask status change:', subtask._id);
+                                <div className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center">
+                                  <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
+                                </div>
+                              </div>
+                              <div className="col-span-2">
+                                <input
+                                  type="text"
+                                  placeholder={isCreatingSubtask ? "Creating subtask..." : "Write a subtask name"}
+                                  value={newSubtaskName}
+                                  onChange={(e) => setNewSubtaskName(e.target.value)}
+                                  onKeyPress={handleSubtaskKeyPress}
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  autoFocus
+                                  disabled={isCreatingSubtask}
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <select
+                                  value={newSubtaskAssignee}
+                                  onChange={(e) => {
+                                    console.log('🟡 Assignee dropdown changed:', e.target.value);
+                                    console.log('🟡 Selected option text:', e.target.options[e.target.selectedIndex].text);
+                                    setNewSubtaskAssignee(e.target.value);
                                   }}
-                                  className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center hover:border-gray-400"
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isCreatingSubtask}
                                 >
-                                  {subtask.status === 'Completed' ? (
-                                    <i className="ri-check-line text-xs text-green-600"></i>
-                                  ) : (
-                                    <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>
-                                  )}
-                                </button>
-                              </div>
-                              <div className="col-span-4">
-                                <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
+                                  <option value="">Unassigned</option>
+                                  {brandUsers.map((user) => (
+                                    <option key={user._id || user.id} value={user._id || user.id}>
+                                      {user.name}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="col-span-2">
-                                <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
-                                  <i className="ri-user-line text-xs text-gray-400"></i>
-                                </div>
+                                <input
+                                  type="date"
+                                  value={newSubtaskStartDate}
+                                  onChange={(e) => setNewSubtaskStartDate(e.target.value)}
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isCreatingSubtask}
+                                />
                               </div>
                               <div className="col-span-2">
-                                <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
-                                  <i className="ri-calendar-line text-xs text-gray-400"></i>
-                                </div>
+                                <input
+                                  type="date"
+                                  value={newSubtaskDueDate}
+                                  onChange={(e) => setNewSubtaskDueDate(e.target.value)}
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isCreatingSubtask}
+                                />
                               </div>
-                              <div className="col-span-2"></div>
-                              <div className="col-span-1"></div>
+                              <div className="col-span-1">
+                                <select
+                                  value={newSubtaskPriority}
+                                  onChange={(e) => setNewSubtaskPriority(e.target.value)}
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isCreatingSubtask}
+                                >
+                                  <option value="Low">Low</option>
+                                  <option value="Medium">Medium</option>
+                                  <option value="High">High</option>
+                                  <option value="Critical">Critical</option>
+                                </select>
+                              </div>
+                              <div className="col-span-2">
+                                <select
+                                  value={newSubtaskStatus}
+                                  onChange={(e) => setNewSubtaskStatus(e.target.value)}
+                                  className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={isCreatingSubtask}
+                                >
+                                  <option value="Yet to Start">Yet to Start</option>
+                                  <option value="In Progress">In Progress</option>
+                                  <option value="Under Review">Under Review</option>
+                                  <option value="Completed">Completed</option>
+                                  <option value="Blocked">Blocked</option>
+                                  <option value="On Hold">On Hold</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                  <option value="Recurring">Recurring</option>
+                                </select>
+                              </div>
                             </div>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="px-6 py-3 pl-14">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartAddingSubtask(task._id);
+                              }}
+                              className="text-sm text-gray-500 hover:text-gray-700 flex items-center space-x-2"
+                            >
+                              <i className="ri-add-line text-sm"></i>
+                              <span>Add subtask...</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -526,7 +809,7 @@ export default function CategoryTaskSections({
                 {/* Add task button for each category */}
                 {editingCategoryId === category._id ? (
                   <div className="px-6 py-3 bg-blue-50 border-l-4 border-blue-500">
-                    <div className="grid grid-cols-12 gap-1 items-center">
+                            <div className="grid grid-cols-12 gap-1 items-center">
                       <div className="col-span-1">
                         <div className="w-4 h-4 border border-gray-300 rounded flex items-center justify-center">
                           <i className="ri-checkbox-blank-line text-xs text-gray-400"></i>

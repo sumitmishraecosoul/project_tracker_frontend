@@ -103,7 +103,13 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getBrandSubtasks();
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        console.warn('SubtaskContext - No brand ID available for fetching subtasks');
+        setSubtasks([]);
+        return;
+      }
+      const response = await apiService.getBrandSubtasks(brandId);
       setSubtasks(response.subtasks || []);
     } catch (err: any) {
       console.error('Error fetching brand subtasks:', err);
@@ -122,11 +128,10 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
         throw new Error('No brand selected');
       }
       // Transform the data to match API expectations
-      const apiData = {
+      const apiData: any = {
         task_id: data.parentTaskId || '',
         title: data.task,
         description: data.description,
-        assignedTo: data.assignedTo,
         reporter: data.reporter,
         status: data.status,
         priority: data.priority,
@@ -138,6 +143,16 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
         relatedSubtasks: data.relatedSubtasks,
         sprint: data.sprint
       };
+      
+      // Only include assignedTo if it's a valid non-empty string
+      if (data.assignedTo && typeof data.assignedTo === 'string' && data.assignedTo.trim() !== '') {
+        apiData.assignedTo = data.assignedTo;
+      }
+      
+      console.log('SubtaskContext - Creating subtask with data:', apiData);
+      console.log('SubtaskContext - Original assignedTo:', data.assignedTo);
+      console.log('SubtaskContext - Final assignedTo:', apiData.assignedTo);
+      
       const response = await apiService.createBrandSubtask(brandId, apiData);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;
@@ -224,17 +239,38 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
       console.log('SubtaskContext - getTaskSubtasks response:', response);
       console.log('SubtaskContext - response.subtasks:', response.subtasks);
       console.log('SubtaskContext - response.data:', response.data);
-      // Try different response structures
+      
+      // Extract subtasks from response
+      let taskSubtasks: Subtask[] = [];
       if (response.subtasks) {
-        return response.subtasks;
+        taskSubtasks = response.subtasks;
       } else if (response.data && Array.isArray(response.data)) {
-        return response.data;
+        taskSubtasks = response.data;
       } else if (Array.isArray(response)) {
-        return response;
+        taskSubtasks = response;
       } else {
         console.log('SubtaskContext - unexpected response structure:', response);
-        return [];
+        taskSubtasks = [];
       }
+      
+      // Update the global subtasks state by merging with existing subtasks
+      setSubtasks(prevSubtasks => {
+        // Remove old subtasks for this task
+        const filtered = prevSubtasks.filter(s => {
+          let sTaskId: string | undefined;
+          if (typeof s.parentTaskId === 'string') {
+            sTaskId = s.parentTaskId;
+          } else if (s.parentTaskId && typeof s.parentTaskId === 'object') {
+            sTaskId = s.parentTaskId._id;
+          }
+          return sTaskId !== taskId;
+        });
+        // Add new subtasks for this task
+        return [...filtered, ...taskSubtasks];
+      });
+      
+      console.log('SubtaskContext - Updated subtasks for task:', taskId, taskSubtasks);
+      return taskSubtasks;
     } catch (err: any) {
       console.error('Error fetching task subtasks:', err);
       setError(err?.message || err?.toString() || 'Failed to fetch task subtasks');

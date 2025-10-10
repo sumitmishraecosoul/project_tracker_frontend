@@ -5,6 +5,8 @@ import { apiService } from '../lib/api-service';
 import DynamicCommentsSection from './DynamicCommentsSection';
 import TaskLinksSection from './TaskLinksSection';
 import { useProjects } from './ProjectContext';
+import { useAuth } from '../lib/contexts/AuthContext';
+import { canDeleteTask } from '../lib/permissions';
 
 interface TaskDetailsPanelProps {
   showTaskDetails: boolean;
@@ -13,6 +15,7 @@ interface TaskDetailsPanelProps {
   onClose: () => void;
   onUpdateTask: () => void;
   onTaskChange: (field: string, value: any) => void;
+  onTaskDelete: (taskId: string) => void;
   currentBrand?: any;
   projectId?: string;
 }
@@ -24,10 +27,12 @@ export default function TaskDetailsPanel({
   onClose,
   onUpdateTask,
   onTaskChange,
+  onTaskDelete,
   currentBrand,
   projectId
 }: TaskDetailsPanelProps) {
   const { currentProject } = useProjects();
+  const { user } = useAuth();
   
   // Task editing states
   const [editingTask, setEditingTask] = useState<any>(null);
@@ -915,12 +920,29 @@ export default function TaskDetailsPanel({
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Task Details</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <i className="ri-close-line w-5 h-5"></i>
-          </button>
+          <div className="flex items-center space-x-2">
+            {user && canDeleteTask(user, currentBrand) && (
+              <button
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete "${selectedTask?.task}"? This action cannot be undone.`)) {
+                    onTaskDelete(selectedTask?._id);
+                    onClose(); // Close the panel after deletion
+                  }
+                }}
+                className="px-3 py-1 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md text-sm font-medium transition-colors"
+                title="Delete task"
+              >
+                <i className="ri-delete-bin-line mr-1"></i>
+                Delete
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <i className="ri-close-line w-5 h-5"></i>
+            </button>
+          </div>
         </div>
       </div>
 

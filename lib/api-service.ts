@@ -101,7 +101,19 @@ class ApiService {
         if (typeof errorData === 'string') {
           errorMessage = errorData;
         } else if (typeof errorData === 'object' && errorData !== null) {
+          // Try to extract the most meaningful error message
           errorMessage = errorData.message || errorData.error || errorData.msg || errorData.details || JSON.stringify(errorData);
+          
+          // For 409 Conflict, provide a more user-friendly message
+          if (response.status === 409) {
+            if (errorMessage.toLowerCase().includes('email')) {
+              errorMessage = 'This email is already registered. Please use a different email or try logging in.';
+            } else if (errorMessage.toLowerCase().includes('employee')) {
+              errorMessage = 'This employee number is already registered. Please use a different employee number.';
+            } else {
+              errorMessage = 'This account already exists. Please try logging in or use different credentials.';
+            }
+          }
         } else {
           errorMessage = String(errorData) || 'API request failed';
         }
@@ -1474,8 +1486,8 @@ class ApiService {
   // ========================================
 
   // 1. Get Brand Subtasks
-  async getBrandSubtasks() {
-    const response = await fetch(`${API_BASE_URL}/api/brands/subtasks`, {
+  async getBrandSubtasks(brandId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks`, {
       headers: this.getAuthHeader()
     });
     return this.handleResponse(response);
@@ -1499,10 +1511,23 @@ class ApiService {
     relatedSubtasks?: string[];
     sprint?: string;
   }) {
+    console.log('🔵 API Service - createBrandSubtask called with:', subtaskData);
+    console.log('🔵 API Service - assignedTo value:', subtaskData.assignedTo);
+    console.log('🔵 API Service - assignedTo type:', typeof subtaskData.assignedTo);
+    console.log('🔵 API Service - assignedTo in object:', 'assignedTo' in subtaskData);
+    
+    // Clean up the data - remove undefined values
+    const cleanedData = Object.fromEntries(
+      Object.entries(subtaskData).filter(([_, value]) => value !== undefined && value !== '')
+    );
+    
+    console.log('🔵 API Service - Cleaned data:', cleanedData);
+    console.log('🔵 API Service - Stringified data:', JSON.stringify(cleanedData));
+    
     const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/subtasks`, {
       method: 'POST',
       headers: this.getAuthHeader(),
-      body: JSON.stringify(subtaskData)
+      body: JSON.stringify(cleanedData)
     });
     return this.handleResponse(response);
   }

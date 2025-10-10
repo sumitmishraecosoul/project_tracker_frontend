@@ -24,6 +24,37 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const { projects, getProjectDetails, currentProject } = useProjects();
   const { currentBrand, isLoading: brandLoading } = useBrand();
   const { subtasks, getTaskSubtasks, createSubtask, updateSubtaskStatus: updateSubtaskStatusContext } = useSubtasks();
+  
+  // Organize subtasks by task ID for display
+  const taskSubtasks = useMemo(() => {
+    // Organize subtasks by task ID for display
+    
+    const organized: { [key: string]: any[] } = {};
+    if (Array.isArray(subtasks)) {
+      subtasks.forEach((subtask) => {
+        // Extract task ID - backend uses 'task_id' field
+        let taskId: string | undefined;
+        if (typeof subtask.parentTaskId === 'string') {
+          taskId = subtask.parentTaskId;
+        } else if (subtask.parentTaskId && typeof subtask.parentTaskId === 'object') {
+          taskId = subtask.parentTaskId._id;
+        } else if ((subtask as any).task_id) {
+          taskId = (subtask as any).task_id;
+        } else if ((subtask as any).taskId) {
+          taskId = (subtask as any).taskId;
+        }
+        
+        if (taskId) {
+          if (!organized[taskId]) {
+            organized[taskId] = [];
+          }
+          organized[taskId].push(subtask);
+        }
+      });
+    }
+    // Return organized subtasks
+    return organized;
+  }, [subtasks]);
   const { closeBothSidebars } = useSidebar();
   // Remove old category context usage
   
@@ -107,6 +138,32 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     loadData();
   }, [projectId, currentBrand]);
 
+  // Load subtasks for all tasks when tasks change
+  useEffect(() => {
+    const loadAllSubtasks = async () => {
+      if (!tasks || tasks.length === 0 || !currentBrand?.id) {
+        console.log('🟢 No tasks to load subtasks for');
+        return;
+      }
+      
+      console.log('🟢 Loading subtasks for all tasks, count:', tasks.length);
+      
+      // Load subtasks for each task
+      for (const task of tasks) {
+        try {
+          console.log('🟢 Loading subtasks for task:', task._id);
+          await getTaskSubtasks(task._id);
+        } catch (error) {
+          console.error('🟢 Error loading subtasks for task:', task._id, error);
+        }
+      }
+      
+      console.log('🟢 Finished loading all subtasks');
+    };
+    
+    loadAllSubtasks();
+  }, [tasks, currentBrand?.id]);
+
   // Listen for task update events to force refresh
   useEffect(() => {
     const handleTaskUpdate = async (event: any) => {
@@ -148,6 +205,47 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       setSelectedCategoryForTask(categoryId);
       setShowNewTaskInput(true);
       setNewTaskName('');
+    }
+  };
+
+  const handleAddSubtask = async (taskId: string, subtaskData?: any) => {
+    console.log('🟢🟢🟢 handleAddSubtask called:', { taskId, subtaskData });
+    
+    if (subtaskData) {
+      // Handle inline subtask creation
+      try {
+        console.log('🟢 handleAddSubtask: Creating subtask with data:', subtaskData);
+        setIsCreatingTask(true);
+        await createSubtask({
+          ...subtaskData,
+          parentTaskId: taskId
+        });
+        console.log('🟢 handleAddSubtask: Subtask created successfully for task:', taskId);
+        
+        // Refresh subtasks for this task to show the newly created subtask
+        if (currentBrand?.id) {
+          console.log('🟢 handleAddSubtask: Refreshing subtasks for task:', taskId);
+          const fetchedSubtasks = await getTaskSubtasks(taskId);
+          console.log('🟢 handleAddSubtask: Subtasks fetched:', fetchedSubtasks);
+          console.log('🟢 handleAddSubtask: Subtasks count:', fetchedSubtasks?.length);
+          console.log('🟢 handleAddSubtask: Subtasks refreshed successfully');
+          
+          // Auto-expand the task to show the new subtask
+          setExpandedTasks(prev => ({
+            ...prev,
+            [taskId]: true
+          }));
+          console.log('🟢 handleAddSubtask: Task expanded to show subtasks');
+        }
+      } catch (error) {
+        console.error('handleAddSubtask: Error creating subtask:', error);
+      } finally {
+        setIsCreatingTask(false);
+      }
+    } else {
+      // Handle opening the add subtask modal or inline form
+      console.log('Add subtask clicked for task:', taskId);
+      // The inline form is now handled in CategoryTaskSections component
     }
   };
 
@@ -316,6 +414,54 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
       [field]: value,
       _lastUpdated: Date.now() // Force a new object reference
     }));
+  };
+
+  const handleTaskDelete = async (taskId: string) => {
+    try {
+      console.log('handleTaskDelete called:', { taskId, brandId: currentBrand?.id });
+      
+      if (!currentBrand?.id) {
+        console.error('No brand ID available for task deletion');
+        alert('No brand selected. Cannot delete task.');
+        return;
+      }
+
+      // Call the API to delete the task
+      const response = await apiService.deleteBrandTask(currentBrand.id, taskId);
+      
+      if (response.success) {
+        console.log('Task deleted successfully');
+        
+        // Close the task details panel if the deleted task was selected
+        if (selectedTask?._id === taskId) {
+          setShowTaskDetails(false);
+          setSelectedTask(null);
+        }
+        
+        // Refresh the task list
+        if (projectId) {
+          await getProjectTasks(currentBrand.id, projectId);
+          console.log('Task list refreshed after deletion');
+        }
+        
+        // Show success message
+        alert('Task deleted successfully!');
+      } else {
+        console.error('Failed to delete task:', response.message);
+        alert(`Failed to delete task: ${response.message}`);
+      }
+    } catch (error: any) {
+      console.error('Error deleting task:', error);
+      
+      // Show user-friendly error message
+      if (error.message && error.message.includes('INSUFFICIENT_ROLE')) {
+        alert('You don\'t have permission to delete tasks. Please contact your administrator.');
+      } else if (error.message && error.message.includes('NOT_FOUND')) {
+        alert('Task not found. It may have already been deleted.');
+      } else {
+        alert('Failed to delete task. Please try again or contact support.');
+      }
+    }
   };
 
 
@@ -554,11 +700,13 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     onTaskSelect={handleTaskSelect}
                     selectedTask={selectedTask}
                     onAddTask={handleAddTask}
+                    onAddSubtask={handleAddSubtask}
                     onTaskStatusChange={handleTaskStatusChange}
                     onTaskCheckboxClick={handleTaskCheckboxClick}
+                    onTaskDelete={handleTaskDelete}
                     expandedTasks={expandedTasks}
                     toggleTaskExpansion={toggleTaskExpansion}
-                      taskSubtasks={subtasks as any}
+                      taskSubtasks={taskSubtasks}
                     getAssigneeAvatar={getAssigneeAvatar}
                     projectId={projectId}
                   />
@@ -579,6 +727,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                   onClose={() => setShowTaskDetails(false)}
                   onUpdateTask={handleUpdateTask}
                   onTaskChange={handleTaskChange}
+                  onTaskDelete={handleTaskDelete}
                   currentBrand={currentBrand}
                   projectId={projectId}
                 />
