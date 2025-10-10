@@ -11,6 +11,7 @@ export default function ProjectTrackerPage() {
   const { currentBrand } = useBrand();
   const { projects, isLoading, error, getBrandProjects } = useProjects();
   const [showProjectManagement, setShowProjectManagement] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed' | 'onhold'>('all');
 
   useEffect(() => {
     console.log('ProjectTrackerPage - currentBrand:', currentBrand);
@@ -27,6 +28,38 @@ export default function ProjectTrackerPage() {
     console.log('ProjectTrackerPage - isLoading:', isLoading);
     console.log('ProjectTrackerPage - error:', error);
   }, [projects, isLoading, error]);
+
+  // Filter projects based on active tab
+  const getFilteredProjects = () => {
+    if (!projects) return [];
+    
+    switch (activeTab) {
+      case 'active':
+        return projects.filter(project => project.status === 'Active');
+      case 'completed':
+        return projects.filter(project => project.status === 'Completed');
+      case 'onhold':
+        return projects.filter(project => project.status === 'On Hold');
+      default:
+        return projects;
+    }
+  };
+
+  const filteredProjects = getFilteredProjects();
+
+  // Get project counts for each tab
+  const getProjectCounts = () => {
+    if (!projects) return { total: 0, active: 0, completed: 0, onhold: 0 };
+    
+    return {
+      total: projects.length,
+      active: projects.filter(p => p.status === 'Active').length,
+      completed: projects.filter(p => p.status === 'Completed').length,
+      onhold: projects.filter(p => p.status === 'On Hold').length
+    };
+  };
+
+  const projectCounts = getProjectCounts();
 
   if (!currentBrand) {
     return (
@@ -63,91 +96,89 @@ export default function ProjectTrackerPage() {
       <div className="p-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-              <div>
-            <h1 className="text-3xl font-bold text-gray-900">Project Management</h1>
-            <p className="text-gray-600 mt-1">
-              Manage projects for <span className="font-medium text-blue-600">{currentBrand.name}</span>
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => {
-                if (currentBrand?.id) {
-                  console.log('Manual refresh - Loading projects for brand:', currentBrand.id);
-                  getBrandProjects(currentBrand.id);
-                }
-              }}
-              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center"
-            >
-              <i className="ri-refresh-line mr-2"></i>
-              Refresh
-            </button>
-            <button
-              onClick={() => setShowProjectManagement(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-            >
-              <i className="ri-settings-3-line mr-2"></i>
-              Manage Projects
-            </button>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
+          <p className="text-gray-600 text-lg mb-1">Overview of your projects and tasks</p>
+          <p className="text-gray-600 text-lg">Role user • Department: Thrive</p>
         </div>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`bg-white p-6 rounded-lg border transition-all duration-200 ${
+              activeTab === 'all'
+                ? 'border-blue-500 shadow-lg'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+            }`}
+          >
             <div className="flex items-center">
               <div className="p-3 bg-blue-100 rounded-lg">
                 <i className="ri-folder-line text-2xl text-blue-600"></i>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Projects</p>
-                <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{projectCounts.total}</p>
               </div>
             </div>
-                </div>
+          </button>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <button
+            onClick={() => setActiveTab('active')}
+            className={`bg-white p-6 rounded-lg border transition-all duration-200 ${
+              activeTab === 'active'
+                ? 'border-green-500 shadow-lg'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+            }`}
+          >
             <div className="flex items-center">
               <div className="p-3 bg-green-100 rounded-lg">
                 <i className="ri-check-line text-2xl text-green-600"></i>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Active Projects</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'Active').length}
-                </p>
-                </div>
-                  </div>
-                </div>
+                <p className="text-2xl font-bold text-gray-900">{projectCounts.active}</p>
+              </div>
+            </div>
+          </button>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`bg-white p-6 rounded-lg border transition-all duration-200 ${
+              activeTab === 'completed'
+                ? 'border-purple-500 shadow-lg'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+            }`}
+          >
             <div className="flex items-center">
               <div className="p-3 bg-purple-100 rounded-lg">
                 <i className="ri-trophy-line text-2xl text-purple-600"></i>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'Completed').length}
-                </p>
-                </div>
+                <p className="text-2xl font-bold text-gray-900">{projectCounts.completed}</p>
               </div>
             </div>
-            
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
+          </button>
+
+          <button
+            onClick={() => setActiveTab('onhold')}
+            className={`bg-white p-6 rounded-lg border transition-all duration-200 ${
+              activeTab === 'onhold'
+                ? 'border-yellow-500 shadow-lg'
+                : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+            }`}
+          >
             <div className="flex items-center">
               <div className="p-3 bg-yellow-100 rounded-lg">
                 <i className="ri-pause-line text-2xl text-yellow-600"></i>
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">On Hold</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter(p => p.status === 'On Hold').length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{projectCounts.onhold}</p>
               </div>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Projects List */}
@@ -183,7 +214,7 @@ export default function ProjectTrackerPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {projects.slice(0, 5).map((project) => (
+              {filteredProjects.slice(0, 5).map((project) => (
                 <div key={project.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -221,13 +252,13 @@ export default function ProjectTrackerPage() {
                 </div>
               ))}
               
-              {projects.length > 5 && (
+              {filteredProjects.length > 5 && (
                 <div className="p-6 text-center border-t border-gray-200">
                                 <button
                     onClick={() => setShowProjectManagement(true)}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    View All {projects.length} Projects →
+                    View All {filteredProjects.length} Projects →
                                 </button>
                         </div>
                       )}

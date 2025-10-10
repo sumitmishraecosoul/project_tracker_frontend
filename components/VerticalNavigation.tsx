@@ -49,19 +49,19 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
   const primaryNavItems = [
     { 
       name: 'Home', 
-      path: '/project-tracker/dashboard',
+      path: '/project-tracker',
       icon: 'ri-home-line'
     },
-    { 
-      name: 'My tasks', 
-      path: '/task-tracker',
-      icon: 'ri-checkbox-line'
-    },
-    { 
-      name: 'Inbox', 
-      path: '/inbox',
-      icon: 'ri-notification-line'
-    },
+    // { 
+    //   name: 'My tasks', 
+    //   path: '/task-tracker',
+    //   icon: 'ri-checkbox-line'
+    // },
+    // { 
+    //   name: 'Inbox', 
+    //   path: '/inbox',
+    //   icon: 'ri-notification-line'
+    // },
     { 
       name: 'Invitations', 
       path: '/invitations',
@@ -91,11 +91,11 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
   }
 
   const isItemActive = (path: string) => {
-    if (path === '/project-tracker/dashboard') {
-      return pathname === '/project-tracker/dashboard' || pathname.startsWith('/project-tracker/dashboard/');
-    }
     if (path === '/project-tracker') {
       return pathname === '/project-tracker' || (pathname.startsWith('/project-tracker/') && !pathname.startsWith('/project-tracker/dashboard'));
+    }
+    if (path === '/project-tracker/dashboard') {
+      return pathname === '/project-tracker/dashboard' || pathname.startsWith('/project-tracker/dashboard/');
     }
     return pathname === path || pathname.startsWith(path + '/');
   };
