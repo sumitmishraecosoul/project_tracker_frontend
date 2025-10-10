@@ -103,7 +103,13 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getBrandSubtasks();
+      const brandId = currentBrand?.id;
+      if (!brandId) {
+        console.warn('SubtaskContext - No brand ID available for fetching subtasks');
+        setSubtasks([]);
+        return;
+      }
+      const response = await apiService.getBrandSubtasks(brandId);
       setSubtasks(response.subtasks || []);
     } catch (err: any) {
       console.error('Error fetching brand subtasks:', err);
@@ -122,11 +128,10 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
         throw new Error('No brand selected');
       }
       // Transform the data to match API expectations
-      const apiData = {
+      const apiData: any = {
         task_id: data.parentTaskId || '',
         title: data.task,
         description: data.description,
-        assignedTo: data.assignedTo,
         reporter: data.reporter,
         status: data.status,
         priority: data.priority,
@@ -138,6 +143,16 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
         relatedSubtasks: data.relatedSubtasks,
         sprint: data.sprint
       };
+      
+      // Only include assignedTo if it's a valid non-empty string
+      if (data.assignedTo && typeof data.assignedTo === 'string' && data.assignedTo.trim() !== '') {
+        apiData.assignedTo = data.assignedTo;
+      }
+      
+      console.log('SubtaskContext - Creating subtask with data:', apiData);
+      console.log('SubtaskContext - Original assignedTo:', data.assignedTo);
+      console.log('SubtaskContext - Final assignedTo:', apiData.assignedTo);
+      
       const response = await apiService.createBrandSubtask(brandId, apiData);
       await getBrandSubtasks(); // Refresh the list
       return response.subtask;

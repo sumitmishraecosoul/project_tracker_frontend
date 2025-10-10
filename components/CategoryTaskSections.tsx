@@ -257,6 +257,15 @@ export default function CategoryTaskSections({
     setNewSubtaskPriority('Low');
     setNewSubtaskStatus('Yet to Start');
     loadBrandUsers();
+    
+    // Debug: Log brandUsers structure
+    console.log('🟡 handleStartAddingSubtask - brandUsers:', brandUsers);
+    console.log('🟡 handleStartAddingSubtask - brandUsers count:', brandUsers.length);
+    if (brandUsers.length > 0) {
+      console.log('🟡 handleStartAddingSubtask - First user structure:', brandUsers[0]);
+      console.log('🟡 handleStartAddingSubtask - First user _id:', brandUsers[0]._id);
+      console.log('🟡 handleStartAddingSubtask - First user name:', brandUsers[0].name);
+    }
   };
 
   const handleCancelAddingSubtask = () => {
@@ -293,7 +302,8 @@ export default function CategoryTaskSections({
       const subtaskData = {
         task: newSubtaskName.trim(),
         parentTaskId: editingTaskId,
-        assignedTo: newSubtaskAssignee || undefined,
+        // Only include assignedTo if it's a valid non-empty string
+        ...(newSubtaskAssignee && newSubtaskAssignee.trim() !== '' ? { assignedTo: newSubtaskAssignee } : {}),
         reporter: userId,
         startDate: newSubtaskStartDate || undefined,
         eta: newSubtaskDueDate || undefined,
@@ -302,6 +312,8 @@ export default function CategoryTaskSections({
       };
       
       console.log('handleCreateSubtask: Calling onAddSubtask with data:', subtaskData);
+      console.log('handleCreateSubtask: assignedTo value:', newSubtaskAssignee);
+      console.log('handleCreateSubtask: brandUsers available:', brandUsers.length);
       await onAddSubtask(editingTaskId, subtaskData);
       console.log('handleCreateSubtask: Subtask created successfully');
       handleCancelAddingSubtask();
@@ -311,6 +323,11 @@ export default function CategoryTaskSections({
       // Show user-friendly error message
       if (error.message && error.message.includes('INSUFFICIENT_ROLE')) {
         alert('You don\'t have permission to create subtasks. Please contact your administrator to grant subtask creation permissions.');
+      } else if (error.message && error.message.includes('Invalid assignedTo')) {
+        alert('Invalid user selected for assignment. Please select a valid user from the dropdown or leave it unassigned.');
+      } else if (error.message && error.message.includes('VALIDATION_ERROR')) {
+        const errorMsg = error.message.match(/"message":"([^"]+)"/)?.[1] || 'Validation error';
+        alert(`Validation Error: ${errorMsg}`);
       } else {
         alert('Failed to create subtask. Please try again or contact support.');
       }
@@ -323,11 +340,16 @@ export default function CategoryTaskSections({
     console.log('handleSubtaskKeyPress called:', {
       key: e.key,
       isCreatingSubtask,
-      newSubtaskName: newSubtaskName.trim()
+      newSubtaskName: newSubtaskName.trim(),
+      newSubtaskAssignee: newSubtaskAssignee,
+      assigneeLength: newSubtaskAssignee.length,
+      assigneeIsEmpty: newSubtaskAssignee === '',
+      brandUsersCount: brandUsers.length
     });
     
     if (e.key === 'Enter' && !isCreatingSubtask) {
       console.log('handleSubtaskKeyPress: Enter pressed, calling handleCreateSubtask');
+      console.log('handleSubtaskKeyPress: Current assignee value:', newSubtaskAssignee);
       handleCreateSubtask();
     } else if (e.key === 'Escape') {
       console.log('handleSubtaskKeyPress: Escape pressed, canceling');
@@ -665,13 +687,17 @@ export default function CategoryTaskSections({
                               <div className="col-span-2">
                                 <select
                                   value={newSubtaskAssignee}
-                                  onChange={(e) => setNewSubtaskAssignee(e.target.value)}
+                                  onChange={(e) => {
+                                    console.log('🟡 Assignee dropdown changed:', e.target.value);
+                                    console.log('🟡 Selected option text:', e.target.options[e.target.selectedIndex].text);
+                                    setNewSubtaskAssignee(e.target.value);
+                                  }}
                                   className="w-full px-1 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   disabled={isCreatingSubtask}
                                 >
                                   <option value="">Unassigned</option>
                                   {brandUsers.map((user) => (
-                                    <option key={user._id} value={user._id}>
+                                    <option key={user._id || user.id} value={user._id || user.id}>
                                       {user.name}
                                     </option>
                                   ))}
