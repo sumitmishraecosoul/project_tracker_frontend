@@ -239,17 +239,38 @@ export const SubtaskProvider: React.FC<SubtaskProviderProps> = ({ children }) =>
       console.log('SubtaskContext - getTaskSubtasks response:', response);
       console.log('SubtaskContext - response.subtasks:', response.subtasks);
       console.log('SubtaskContext - response.data:', response.data);
-      // Try different response structures
+      
+      // Extract subtasks from response
+      let taskSubtasks: Subtask[] = [];
       if (response.subtasks) {
-        return response.subtasks;
+        taskSubtasks = response.subtasks;
       } else if (response.data && Array.isArray(response.data)) {
-        return response.data;
+        taskSubtasks = response.data;
       } else if (Array.isArray(response)) {
-        return response;
+        taskSubtasks = response;
       } else {
         console.log('SubtaskContext - unexpected response structure:', response);
-        return [];
+        taskSubtasks = [];
       }
+      
+      // Update the global subtasks state by merging with existing subtasks
+      setSubtasks(prevSubtasks => {
+        // Remove old subtasks for this task
+        const filtered = prevSubtasks.filter(s => {
+          let sTaskId: string | undefined;
+          if (typeof s.parentTaskId === 'string') {
+            sTaskId = s.parentTaskId;
+          } else if (s.parentTaskId && typeof s.parentTaskId === 'object') {
+            sTaskId = s.parentTaskId._id;
+          }
+          return sTaskId !== taskId;
+        });
+        // Add new subtasks for this task
+        return [...filtered, ...taskSubtasks];
+      });
+      
+      console.log('SubtaskContext - Updated subtasks for task:', taskId, taskSubtasks);
+      return taskSubtasks;
     } catch (err: any) {
       console.error('Error fetching task subtasks:', err);
       setError(err?.message || err?.toString() || 'Failed to fetch task subtasks');

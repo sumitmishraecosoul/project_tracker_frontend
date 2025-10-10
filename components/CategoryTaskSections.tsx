@@ -642,21 +642,54 @@ export default function CategoryTaskSections({
                                       )}
                                     </button>
                                   </div>
-                                  <div className="col-span-4">
+                                  <div className="col-span-2">
                                     <span className="text-sm text-gray-700">{subtask.title || subtask.task}</span>
                                   </div>
                                   <div className="col-span-2">
-                                    <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
-                                      <i className="ri-user-line text-xs text-gray-400"></i>
+                                    <div className="flex items-center space-x-1">
+                                      <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
+                                        <i className="ri-user-line text-xs text-gray-400"></i>
+                                      </div>
+                                      <span className="text-sm text-gray-900 truncate">
+                                        {subtask.assignedTo?.name || 'Unassigned'}
+                                      </span>
                                     </div>
                                   </div>
                                   <div className="col-span-2">
-                                    <div className="w-6 h-6 border border-gray-300 rounded-full flex items-center justify-center">
-                                      <i className="ri-calendar-line text-xs text-gray-400"></i>
-                                    </div>
+                                    <span className="text-sm text-gray-500">
+                                      {subtask.startDate ? new Date(subtask.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                    </span>
                                   </div>
-                                  <div className="col-span-2"></div>
-                                  <div className="col-span-1"></div>
+                                  <div className="col-span-2">
+                                    <span className="text-sm text-gray-500">
+                                      {subtask.dueDate ? new Date(subtask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-1">
+                                    <span className={`px-0.5 py-0.5 rounded text-xs font-medium ${
+                                      subtask.priority === 'High' ? 'bg-red-100 text-red-800' :
+                                      subtask.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {subtask.priority || 'Low'}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2 flex items-center justify-center">
+                                    <select 
+                                      value={subtask.status || 'Yet to Start'}
+                                      onChange={(e) => {
+                                        // Handle subtask status change
+                                        console.log('Subtask status change:', subtask._id, e.target.value);
+                                      }}
+                                      className="px-1 py-1 rounded text-xs font-medium border-0 bg-transparent bg-gray-100 text-gray-800"
+                                    >
+                                      <option value="Yet to Start">Yet to Start</option>
+                                      <option value="In Progress">In Progress</option>
+                                      <option value="Completed">Completed</option>
+                                      <option value="On Hold">On Hold</option>
+                                      <option value="Under Review">Under Review</option>
+                                    </select>
+                                  </div>
                                 </div>
                               </div>
                             ))}

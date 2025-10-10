@@ -24,6 +24,37 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   const { projects, getProjectDetails, currentProject } = useProjects();
   const { currentBrand, isLoading: brandLoading } = useBrand();
   const { subtasks, getTaskSubtasks, createSubtask, updateSubtaskStatus: updateSubtaskStatusContext } = useSubtasks();
+  
+  // Organize subtasks by task ID for display
+  const taskSubtasks = useMemo(() => {
+    // Organize subtasks by task ID for display
+    
+    const organized: { [key: string]: any[] } = {};
+    if (Array.isArray(subtasks)) {
+      subtasks.forEach((subtask) => {
+        // Extract task ID - backend uses 'task_id' field
+        let taskId: string | undefined;
+        if (typeof subtask.parentTaskId === 'string') {
+          taskId = subtask.parentTaskId;
+        } else if (subtask.parentTaskId && typeof subtask.parentTaskId === 'object') {
+          taskId = subtask.parentTaskId._id;
+        } else if ((subtask as any).task_id) {
+          taskId = (subtask as any).task_id;
+        } else if ((subtask as any).taskId) {
+          taskId = (subtask as any).taskId;
+        }
+        
+        if (taskId) {
+          if (!organized[taskId]) {
+            organized[taskId] = [];
+          }
+          organized[taskId].push(subtask);
+        }
+      });
+    }
+    // Return organized subtasks
+    return organized;
+  }, [subtasks]);
   const { closeBothSidebars } = useSidebar();
   // Remove old category context usage
   
@@ -107,6 +138,32 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
     loadData();
   }, [projectId, currentBrand]);
 
+  // Load subtasks for all tasks when tasks change
+  useEffect(() => {
+    const loadAllSubtasks = async () => {
+      if (!tasks || tasks.length === 0 || !currentBrand?.id) {
+        console.log('🟢 No tasks to load subtasks for');
+        return;
+      }
+      
+      console.log('🟢 Loading subtasks for all tasks, count:', tasks.length);
+      
+      // Load subtasks for each task
+      for (const task of tasks) {
+        try {
+          console.log('🟢 Loading subtasks for task:', task._id);
+          await getTaskSubtasks(task._id);
+        } catch (error) {
+          console.error('🟢 Error loading subtasks for task:', task._id, error);
+        }
+      }
+      
+      console.log('🟢 Finished loading all subtasks');
+    };
+    
+    loadAllSubtasks();
+  }, [tasks, currentBrand?.id]);
+
   // Listen for task update events to force refresh
   useEffect(() => {
     const handleTaskUpdate = async (event: any) => {
@@ -152,18 +209,34 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
   };
 
   const handleAddSubtask = async (taskId: string, subtaskData?: any) => {
-    console.log('handleAddSubtask called:', { taskId, subtaskData });
+    console.log('🟢🟢🟢 handleAddSubtask called:', { taskId, subtaskData });
     
     if (subtaskData) {
       // Handle inline subtask creation
       try {
-        console.log('handleAddSubtask: Creating subtask with data:', subtaskData);
+        console.log('🟢 handleAddSubtask: Creating subtask with data:', subtaskData);
         setIsCreatingTask(true);
         await createSubtask({
           ...subtaskData,
           parentTaskId: taskId
         });
-        console.log('handleAddSubtask: Subtask created successfully for task:', taskId);
+        console.log('🟢 handleAddSubtask: Subtask created successfully for task:', taskId);
+        
+        // Refresh subtasks for this task to show the newly created subtask
+        if (currentBrand?.id) {
+          console.log('🟢 handleAddSubtask: Refreshing subtasks for task:', taskId);
+          const fetchedSubtasks = await getTaskSubtasks(taskId);
+          console.log('🟢 handleAddSubtask: Subtasks fetched:', fetchedSubtasks);
+          console.log('🟢 handleAddSubtask: Subtasks count:', fetchedSubtasks?.length);
+          console.log('🟢 handleAddSubtask: Subtasks refreshed successfully');
+          
+          // Auto-expand the task to show the new subtask
+          setExpandedTasks(prev => ({
+            ...prev,
+            [taskId]: true
+          }));
+          console.log('🟢 handleAddSubtask: Task expanded to show subtasks');
+        }
       } catch (error) {
         console.error('handleAddSubtask: Error creating subtask:', error);
       } finally {
@@ -633,7 +706,7 @@ export default function ModernProjectDetail({ projectId, selectedBrand = null }:
                     onTaskDelete={handleTaskDelete}
                     expandedTasks={expandedTasks}
                     toggleTaskExpansion={toggleTaskExpansion}
-                      taskSubtasks={subtasks as any}
+                      taskSubtasks={taskSubtasks}
                     getAssigneeAvatar={getAssigneeAvatar}
                     projectId={projectId}
                   />
