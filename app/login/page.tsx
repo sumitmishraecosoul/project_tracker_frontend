@@ -48,116 +48,135 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <Image
-              src="/worklytics_logo.png"
-              alt="Worklytics Logo"
-              width={120}
-              height={120}
-              className="object-contain"
-            />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome Back
-          </h2>
-          <p className="text-gray-600">
-            Sign in to your account to continue
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="ri-mail-line text-gray-400"></i>
-                </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  placeholder="Enter your email"
-                />
-              </div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: 'url(/login_bg.svg)',
+          filter: 'brightness(0.6) contrast(1.1)'
+        }}
+      />
+      
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-900/85 via-gray-800/75 to-gray-900/85" />
+      
+      {/* Main Content */}
+      <div className="relative z-10 min-h-screen flex">
+        {/* Left Panel - Branding */}
+        <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center px-8 py-16">
+          <div className="text-center">
+            {/* Logo */}
+            <div className="mb-8">
+              <Image
+                src="/vector_icon.svg"
+                alt="VECTOR WORKLYTICS Logo"
+                width={350}
+                height={150}
+                className="object-contain mx-auto"
+              />
             </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="ri-lock-line text-gray-400"></i>
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  placeholder="Enter your password"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap cursor-pointer"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <i className="ri-loader-4-line animate-spin mr-2"></i>
-                  Signing In...
-                </div>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <button
-                onClick={() => router.push('/signup')}
-                className="text-blue-600 hover:text-blue-500 font-medium"
-              >
-                Sign up here
-              </button>
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Forgot your password?{' '}
-              <button
-                onClick={() => router.push('/forgot-password')}
-                className="text-blue-600 hover:text-blue-500 font-medium"
-              >
-                Reset it here
-              </button>
-            </p>
+            
+            {/* Welcome Message */}
+            <h2 className="text-5xl font-light text-white leading-tight">
+              Welcome Back.
+            </h2>
           </div>
         </div>
-
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Make sure your backend server is running on http://localhost:5000
-          </p>
+        
+        {/* Right Panel - Login Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-start pl-4 py-12">
+          <div className="w-full max-w-md">
+            {/* Login Form Card */}
+            <div className="backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl" style={{ backgroundColor: 'rgba(11, 38, 57, 0.8)' }}>
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-semibold text-white mb-2">
+                  Enter your email to sign in.
+                </h3>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="bg-red-500/20 border border-red-400/50 text-red-200 px-4 py-3 rounded-lg text-sm backdrop-blur-sm">
+                    {error}
+                  </div>
+                )}
+                
+                {/* Email Field */}
+                <div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full px-4 py-4 bg-white/90 rounded-xl border-0 focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all duration-200"
+                    style={{ color: '#A28750' }}
+                    placeholder="email@domain.com"
+                  />
+                </div>
+                
+                {/* Password Field */}
+                <div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full px-4 py-4 bg-white/90 rounded-xl border-0 focus:ring-2 focus:ring-orange-400 focus:bg-white transition-all duration-200"
+                    style={{ color: '#A28750' }}
+                    placeholder="password"
+                  />
+                </div>
+                
+                {/* Continue Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full text-white py-4 px-6 rounded-xl font-semibold focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                  style={{ backgroundColor: '#DCBA87' }}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center">
+                      <i className="ri-loader-4-line animate-spin mr-2"></i>
+                      Signing In...
+                    </div>
+                  ) : (
+                    'Continue'
+                  )}
+                </button>
+              </form>
+              
+              {/* Sign Up Link */}
+              <div className="mt-6 text-center">
+                <p className="text-white/80 text-sm">
+                  New Account?{' '}
+                  <button
+                    onClick={() => router.push('/signup')}
+                    className="text-white font-semibold hover:text-orange-300 transition-colors duration-200"
+                  >
+                    Sign Up Now.
+                  </button>
+                </p>
+              </div>
+              
+              {/* Terms and Privacy */}
+              <div className="mt-8 text-center">
+                <p className="text-white/60 text-xs leading-relaxed">
+                  By clicking continue, you agree to our{' '}
+                  <button className="text-white/80 hover:text-white transition-colors duration-200">
+                    Terms of Service
+                  </button>{' '}
+                  and{' '}
+                  <button className="text-white/80 hover:text-white transition-colors duration-200">
+                    Privacy Policy
+                  </button>
+                  .
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
