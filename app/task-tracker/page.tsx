@@ -2,9 +2,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import VerticalLayout from '../../components/VerticalLayout';
 import AddUserTaskModal from '../../components/AddUserTaskModal';
 import EditTaskModal from '../../components/EditTaskModal';
+import CommentsModal from '../../components/CommentsModal';
+import SendTasksModal from '../../components/SendTasksModal';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { apiService } from '../../lib/api-service';
 import { DEPARTMENTS } from '../../lib/constants';
@@ -13,6 +16,7 @@ import { useSidebar } from '../../components/SidebarContext';
 
 export default function TaskTracker() {
   const { closeBothSidebars } = useSidebar();
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeUserId, setActiveUserId] = useState<string>('');
@@ -26,9 +30,22 @@ export default function TaskTracker() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
+  const [selectedTaskForComments, setSelectedTaskForComments] = useState<Task | null>(null);
+  const [isSendTasksModalOpen, setIsSendTasksModalOpen] = useState(false);
+
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Check for sendTasks parameter on component mount
+  useEffect(() => {
+    const sendTasksParam = searchParams.get('sendTasks');
+    if (sendTasksParam === 'true') {
+      setIsSendTasksModalOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchUsers();
@@ -359,16 +376,26 @@ export default function TaskTracker() {
 
   const handleAddTaskClick = () => {
     setIsAddModalOpen(true);
-    
+
     // Close both sidebars when opening add task modal
     closeBothSidebars();
   };
+
+  const handleCommentsClick = (task: Task) => {
+    setSelectedTaskForComments(task);
+    setIsCommentsModalOpen(true);
+
+    // Close both sidebars when opening comments modal
+    closeBothSidebars();
+  };
+
+
 
   const handleSaveTask = (updatedTask: any) => {
     const saveTask = async () => {
       try {
         console.log('Saving updated task:', updatedTask);
-        
+
         // Prepare the data for the API - only send the fields that the backend expects
         const taskDataForAPI = {
           task: updatedTask.task,
@@ -391,7 +418,7 @@ export default function TaskTracker() {
           parentTask: updatedTask.parentTask,
           sprint: updatedTask.sprint
         };
-        
+
         console.log('Task data for API:', taskDataForAPI);
         await apiService.updateTask(updatedTask._id, taskDataForAPI);
         console.log('Task updated successfully');
@@ -404,9 +431,35 @@ export default function TaskTracker() {
         setError('Failed to update task');
       }
     };
-    
+
     saveTask();
   };
+
+  const handleSendTasks = async (emailData: { to: string; subject: string; message: string; tasks: Task[]; regards?: string }) => {
+    try {
+      // Get current brand ID from localStorage
+      const currentBrandStr = localStorage.getItem('currentBrand');
+      if (!currentBrandStr) {
+        alert('No brand selected. Please select a brand first.');
+        return;
+      }
+
+      const currentBrand = JSON.parse(currentBrandStr);
+      const brandId = currentBrand._id;
+
+      console.log('Sending tasks email:', { brandId, emailData });
+
+      // Send email directly via API
+      await apiService.sendTasksEmail(brandId, emailData);
+      alert('Tasks sent successfully!');
+      setIsSendTasksModalOpen(false);
+    } catch (error) {
+      console.error('Failed to send tasks:', error);
+      alert('Failed to send tasks. Please try again.');
+    }
+  };
+
+
 
   return (
     <ProtectedRoute>
@@ -432,13 +485,22 @@ export default function TaskTracker() {
                 )}
               </div>
               {canCreateTask() && (
-                <button
-                  onClick={handleAddTaskClick}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
-                >
-                  <i className="ri-add-line w-5 h-5"></i>
-                  <span>Add New Task</span>
-                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleAddTaskClick}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
+                  >
+                    <i className="ri-add-line w-5 h-5"></i>
+                    <span>Add New Task</span>
+                  </button>
+                  <button
+                    onClick={() => setIsSendTasksModalOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium cursor-pointer whitespace-nowrap flex items-center space-x-2"
+                  >
+                    <i className="ri-send-plane-line w-5 h-5"></i>
+                    <span>Send All Tasks</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -526,10 +588,10 @@ export default function TaskTracker() {
                           onChange={(e) => setDepartmentFilter(e.target.value)}
                           className="px-3 py-2 border border-gray-300 rounded-md text-sm min-w-[200px]"
                         >
-                                                  <option value="All Departments">All Departments</option>
-                        {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ))}
+                          <option value="All Departments">All Departments</option>
+                          {(availableDepartments.length > 0 ? availableDepartments : DEPARTMENTS).map((dept) => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
                         </select>
                       </div>
                     )}
@@ -659,6 +721,14 @@ export default function TaskTracker() {
                                     Edit
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => handleCommentsClick(task)}
+                                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200 shadow-sm"
+                                  title="View Comments"
+                                >
+                                  <i className="ri-chat-1-line w-3 h-3 mr-1"></i>
+                                  Comments
+                                </button>
                                 {canDeleteTask(task) && (
                                   <button
                                     onClick={() => handleDeleteTask(task._id)}
@@ -706,6 +776,23 @@ export default function TaskTracker() {
             }}
           />
         )}
+
+        <CommentsModal
+          isOpen={isCommentsModalOpen}
+          taskId={selectedTaskForComments?._id || ''}
+          taskTitle={selectedTaskForComments?.task || ''}
+          onClose={() => {
+            setIsCommentsModalOpen(false);
+            setSelectedTaskForComments(null);
+          }}
+        />
+
+        <SendTasksModal
+          isOpen={isSendTasksModalOpen}
+          tasks={filteredTasks}
+          onClose={() => setIsSendTasksModalOpen(false)}
+          onSend={handleSendTasks}
+        />
       </VerticalLayout>
     </ProtectedRoute>
   );

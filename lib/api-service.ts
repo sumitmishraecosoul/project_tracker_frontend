@@ -2244,6 +2244,43 @@ class ApiService {
     }
   }
 
+  // ==================== EMAIL API METHODS ====================
+
+  /**
+   * Send email with task details
+   */
+  async sendTasksEmail(brandId: string, emailData: {
+    to: string;
+    subject: string;
+    message: string;
+    tasks: any[];
+    regards?: string;
+    isHtml?: boolean;
+  }) {
+    console.log('ApiService: Sending tasks email', { brandId, emailData });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/brands/${brandId}/tasks/send-email`, {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(emailData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('ApiService: Send tasks email response', data);
+      return data;
+    } catch (error) {
+      console.error('ApiService: Send tasks email error', error);
+      throw error;
+    }
+  }
+
 }
 
 export const apiService = new ApiService();

@@ -47,15 +47,20 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
   };
   
   const primaryNavItems = [
-    { 
-      name: 'Home', 
+    {
+      name: 'Home',
       path: '/project-tracker',
       icon: 'ri-home-line'
     },
-      { 
-      name: 'My tasks', 
+      {
+      name: 'My tasks',
       path: '/task-tracker',
       icon: 'ri-checkbox-line'
+    },
+    {
+      name: 'Send All Tasks',
+      path: '/task-tracker?sendTasks=true',
+      icon: 'ri-send-plane-line'
     },
     // { 
     //   name: 'Inbox', 

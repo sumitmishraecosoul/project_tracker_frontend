@@ -8,6 +8,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@uiw/react-md-editor": "^4.0.8",
     "axios": "^1.12.2",
     "emoji-picker-react": "^4.13.3",
