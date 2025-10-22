@@ -52,11 +52,11 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
       path: '/project-tracker',
       icon: 'ri-home-line'
     },
-    // { 
-    //   name: 'My tasks', 
-    //   path: '/task-tracker',
-    //   icon: 'ri-checkbox-line'
-    // },
+      { 
+      name: 'My tasks', 
+      path: '/task-tracker',
+      icon: 'ri-checkbox-line'
+    },
     // { 
     //   name: 'Inbox', 
     //   path: '/inbox',
