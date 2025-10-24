@@ -7,7 +7,7 @@ WEBSITE_NODE_DEFAULT_VERSION: 18.17.0
 # Environment variables
 NODE_ENV: production
 NPM_CONFIG_PRODUCTION: false
-NEXT_PUBLIC_API_URL: https://project-tracker-backend-xi.vercel.app
+NEXT_PUBLIC_API_URL: https://project-backend.thrivebrands.in
 
 # Build configuration
 SCM_DO_BUILD_DURING_DEPLOYMENT: true

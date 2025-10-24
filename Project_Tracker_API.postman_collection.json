@@ -460,7 +460,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:5000"
+      "value": "https://project-backend.thrivebrands.in"
     },
     {
       "key": "token",

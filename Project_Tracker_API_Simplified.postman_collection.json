@@ -1135,7 +1135,7 @@
     }
   ],
   "variable": [
-    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "base_url", "value": "https://project-backend.thrivebrands.in" },
     { "key": "token", "value": "" },
     { "key": "user_id", "value": "507f1f77bcf86cd799439011" },
     { "key": "project_id", "value": "PROJ-001" },

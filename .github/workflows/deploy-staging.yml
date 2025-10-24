@@ -47,7 +47,7 @@ jobs:
         startup-command: 'npm start'
         app-settings: |
           NODE_ENV=staging
-          NEXT_PUBLIC_API_URL=https://project-tracker-backend-xi.vercel.app
+          NEXT_PUBLIC_API_URL=https://project-backend.thrivebrands.in
         
     - name: Run smoke tests
       run: |

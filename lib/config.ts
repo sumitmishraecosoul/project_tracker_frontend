@@ -3,9 +3,9 @@ export const config = {
   // API Configuration
   api: {
     // Development backend URL
-    development: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+    development: process.env.NEXT_PUBLIC_API_URL || 'https://project-backend.thrivebrands.in',
     // Production backend URL
-    production: 'https://project-tracker-backend-xi.vercel.app',
+    production: 'https://project-backend.thrivebrands.in',
   },
   
   // Environment detection

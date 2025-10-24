@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:5000/api",
+      "value": "https://project-backend.thrivebrands.in/api",
       "type": "string"
     },
     {
