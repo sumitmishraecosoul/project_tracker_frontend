@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import VerticalLayout from '../../components/VerticalLayout';
 import AddUserTaskModal from '../../components/AddUserTaskModal';
@@ -14,7 +13,7 @@ import { DEPARTMENTS } from '../../lib/constants';
 import { Task, User } from '../../lib/types';
 import { useSidebar } from '../../components/SidebarContext';
 
-export default function TaskTracker() {
+function TaskTrackerContent() {
   const { closeBothSidebars } = useSidebar();
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
@@ -33,7 +32,6 @@ export default function TaskTracker() {
   const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
   const [selectedTaskForComments, setSelectedTaskForComments] = useState<Task | null>(null);
   const [isSendTasksModalOpen, setIsSendTasksModalOpen] = useState(false);
-
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +52,7 @@ export default function TaskTracker() {
     if (userStr) {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
-      
+
       // Set default department based on user role
       if (user.role === 'admin') {
         if (user.department) {
@@ -106,13 +104,13 @@ export default function TaskTracker() {
           limit: 1000, // Large limit to get all projects
           page: 1
         };
-        
+
         // Add department filter for admin users only
         if (currentUser?.role === 'admin') {
           // Always send department parameter - backend will handle "All Departments" case
           params.department = departmentFilter;
         }
-        
+
         console.log('Loading all projects for task tracker dropdown with params:', params);
         const data = await apiService.getProjects(params);
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.projects) ? data.projects : []);
@@ -144,9 +142,9 @@ export default function TaskTracker() {
       // Get current user to determine department-based filtering
       const currentUserStr = localStorage.getItem('currentUser');
       const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
-      
+
       let usersData: User[] = [];
-      
+
       if (currentUser?.role === 'admin') {
         if (departmentFilter === 'All Departments') {
           // Admin with "All Departments" - show all users
@@ -173,7 +171,7 @@ export default function TaskTracker() {
         })) : [];
         setUsers(usersData);
       }
-      
+
       // Set first user as active if available
       if (usersData.length > 0 && !activeUserId) {
         if (usersData[0]._id) {
@@ -196,7 +194,7 @@ export default function TaskTracker() {
     setLoading(true);
     try {
       console.log('Calling apiService.getTasks()...');
-      
+
       // Map task tab to API parameters
       let taskTypeParam: string | undefined;
       if (activeTaskTab === 'Adhoc Tasks') {
@@ -209,9 +207,9 @@ export default function TaskTracker() {
         taskTypeParam = 'Monthly';
       }
       // For 'All Tasks', don't pass taskType parameter
-      
+
       const projectIdParam = projectFilter && projectFilter !== 'All Projects' ? projectFilter : undefined;
-      
+
       // Add department filter for admin users
       const params: any = {
         assignedTo: activeUserId,
@@ -219,17 +217,17 @@ export default function TaskTracker() {
         status: statusFilter === 'All' ? '' : statusFilter,
         projectId: projectIdParam
       };
-      
+
       if (currentUser?.role === 'admin') {
         // Always send department parameter - backend will handle "All Departments" case
         params.department = departmentFilter;
       }
-      
+
       const data = await apiService.getTasks(params);
       console.log('All tasks fetched from API:', data);
       console.log('Tasks data type:', typeof data);
       console.log('Tasks is array:', Array.isArray(data));
-      
+
       // Check if data is an array and has the expected structure
       if (!Array.isArray(data)) {
         console.error('API response is not an array:', data);
@@ -237,9 +235,9 @@ export default function TaskTracker() {
         setLoading(false);
         return;
       }
-      
+
       console.log('Number of tasks fetched:', data.length);
-      
+
       // Log the first few tasks to see their structure
       if (data.length > 0) {
         console.log('Sample task structure:', data[0]);
@@ -249,14 +247,14 @@ export default function TaskTracker() {
       } else {
         console.log('No tasks found in API response');
       }
-      
+
       // Backend now handles RBAC filtering, so we can use the data directly
       // Apply project filter on the client if selected
       let filteredTasks = data;
       if (projectFilter && projectFilter !== 'All Projects') {
         filteredTasks = data.filter((task: any) => task.projectId === projectFilter);
       }
-      
+
       // Add client-side filtering by assignedTo as fallback
       // This ensures only tasks for the selected user are shown
       filteredTasks = filteredTasks.filter((task: any) => {
@@ -267,7 +265,7 @@ export default function TaskTracker() {
         }
         return false;
       });
-      
+
       console.log('Tasks from API (RBAC filtered):', filteredTasks);
       console.log('Active user:', activeUser);
       setTasks(filteredTasks as Task[]);
@@ -280,7 +278,7 @@ export default function TaskTracker() {
 
   const activeUser = users.find(user => user._id === activeUserId);
   const filteredTasks = Array.isArray(tasks) ? tasks : [];
-  
+
   console.log('=== Task Display Debug ===');
   console.log('Active user:', activeUser);
   console.log('All tasks for user:', tasks);
@@ -304,48 +302,48 @@ export default function TaskTracker() {
   // Helper functions for role-based permissions
   const canEditTask = (task: Task): boolean => {
     if (!currentUser) return false;
-    
+
     // Admin can edit any task
     if (currentUser.role === 'admin') return true;
-    
+
     // Manager can edit tasks from their department
     if (currentUser.role === 'manager') {
       // Manager can edit any task - backend will handle department restrictions
       return true;
     }
-    
+
     // Employees can edit tasks assigned to them or created by them
     if (currentUser.role === 'employee') {
-      return task.assignedTo?._id === currentUser._id || 
+      return task.assignedTo?._id === currentUser._id ||
              task.reporter?._id === currentUser._id;
     }
-    
+
     return false;
   };
 
   const canDeleteTask = (task: Task): boolean => {
     if (!currentUser) return false;
-    
+
     // Admin can delete any task
     if (currentUser.role === 'admin') return true;
-    
+
     // Manager can delete tasks from their department
     if (currentUser.role === 'manager') {
       // Manager can edit any task - backend will handle department restrictions
       return true;
     }
-    
+
     // Employees CANNOT delete any tasks
     if (currentUser.role === 'employee') {
       return false;
     }
-    
+
     return false;
   };
 
   const canCreateTask = (): boolean => {
     if (!currentUser) return false;
-    
+
     // ALL users can create tasks now (admin, manager, employee)
     // Backend will handle the specific restrictions for each role
     return true;
@@ -369,7 +367,7 @@ export default function TaskTracker() {
     console.log('Edit task clicked:', task);
     setEditingTask(task);
     setIsEditModalOpen(true);
-    
+
     // Close both sidebars when opening task edit modal
     closeBothSidebars();
   };
@@ -388,8 +386,6 @@ export default function TaskTracker() {
     // Close both sidebars when opening comments modal
     closeBothSidebars();
   };
-
-
 
   const handleSaveTask = (updatedTask: any) => {
     const saveTask = async () => {
@@ -458,8 +454,6 @@ export default function TaskTracker() {
       alert('Failed to send tasks. Please try again.');
     }
   };
-
-
 
   return (
     <ProtectedRoute>
@@ -645,8 +639,8 @@ export default function TaskTracker() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.task}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {task.projectId 
-                                ? (typeof task.projectId === 'string' 
+                              {task.projectId
+                                ? (typeof task.projectId === 'string'
                                     ? (projectMap[task.projectId] || task.projectId)
                                     : task.projectId.title)
                                 : 'No Project'}
@@ -667,7 +661,7 @@ export default function TaskTracker() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          task.status === 'Completed' 
+                          task.status === 'Completed'
                             ? 'bg-green-100 text-green-800'
                             : task.status === 'In Progress'
                             ? 'bg-yellow-100 text-yellow-800'
@@ -795,5 +789,13 @@ export default function TaskTracker() {
         />
       </VerticalLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function TaskTrackerPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TaskTrackerContent />
+    </Suspense>
   );
 }
