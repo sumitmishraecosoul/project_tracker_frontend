@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import VerticalLayout from '../../components/VerticalLayout';
 import AddUserTaskModal from '../../components/AddUserTaskModal';
@@ -14,7 +14,7 @@ import { DEPARTMENTS } from '../../lib/constants';
 import { Task, User } from '../../lib/types';
 import { useSidebar } from '../../components/SidebarContext';
 
-export default function TaskTracker() {
+function TaskTracker() {
   const { closeBothSidebars } = useSidebar();
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
@@ -795,5 +795,13 @@ export default function TaskTracker() {
         />
       </VerticalLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function TaskTrackerPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TaskTracker />
+    </Suspense>
   );
 }
