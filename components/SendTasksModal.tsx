@@ -30,7 +30,7 @@ export default function SendTasksModal({ isOpen, tasks, onClose, onSend }: SendT
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Send All Tasks</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Send All Tasks Report</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
