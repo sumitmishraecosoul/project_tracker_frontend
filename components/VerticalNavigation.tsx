@@ -57,11 +57,11 @@ export default function VerticalNavigation({ isCollapsed, onToggle }: VerticalNa
       path: '/task-tracker',
       icon: 'ri-checkbox-line'
     },
-    {
-      name: 'Send All Tasks',
-      path: '/task-tracker?sendTasks=true',
-      icon: 'ri-send-plane-line'
-    },
+    // {
+    //   name: 'Send All Tasks',
+    //   path: '/task-tracker?sendTasks=true',
+    //   icon: 'ri-send-plane-line'
+    // },
     // { 
     //   name: 'Inbox', 
     //   path: '/inbox',
